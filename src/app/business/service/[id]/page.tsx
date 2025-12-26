@@ -25,6 +25,12 @@ const BARBER_VENDOR = {
     lng: -0.1600,
     coverImage: "/others/haircut_1.jpg",
     imageUrl: "/people/person_6.jpg",
+    reviews: 214,
+    phone: "+233 55 987 6543",
+    email: "kwame@barber.com",
+    address: "East Legon, near A&C Mall",
+    type: "business" as const,
+    businessType: "service" as const,
 };
 
 // Mock Service Data

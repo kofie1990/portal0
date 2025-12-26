@@ -26,6 +26,12 @@ const ATELIER_VENDOR = {
     hasPhysicalLocation: true,
     coverImage: "/others/storefront.jpg",
     imageUrl: "/others/store_2.jpg",
+    reviews: 128,
+    phone: "+233 55 123 4567",
+    email: "hello@theatelier.com",
+    address: "145 Osu Badu Street, Osu, Accra",
+    type: "business" as const,
+    businessType: "product" as const,
 };
 
 // Mock Product Data
