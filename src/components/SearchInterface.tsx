@@ -9,29 +9,38 @@ interface SearchInterfaceProps {
     onQueryChange: (query: string) => void;
     onCategoryChange: (category: string) => void;
     activeCategory: string;
+    onSubmit?: () => void;
 }
 
-export default function SearchInterface({ onQueryChange, onCategoryChange, activeCategory }: SearchInterfaceProps) {
+export default function SearchInterface({ onQueryChange, onCategoryChange, activeCategory, onSubmit }: SearchInterfaceProps) {
 
     return (
-        <div className="w-full max-w-4xl mx-auto p-6 relative z-20 -mt-12">
+        <div className="w-full max-w-4xl mx-auto p-0 relative z-20">
             <motion.div
-                initial={{ y: 20, opacity: 0 }}
-                whileInView={{ y: 0, opacity: 1 }}
-                viewport={{ once: true }}
-                className="glass-panel rounded-3xl p-4 shadow-2xl border border-white/10"
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="glass-panel rounded-3xl p-3 md:p-4 shadow-2xl border border-white/10"
             >
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                     {/* Main Search Bar */}
                     <div className="relative flex items-center bg-white/5 dark:bg-black/20 rounded-2xl p-2 transition-colors focus-within:bg-white/10 dark:focus-within:bg-black/40">
-                        <Search className="w-6 h-6 text-neutral-400 ml-3" />
+                        <Search className="w-5 h-5 md:w-6 md:h-6 text-neutral-400 ml-2" />
                         <input
                             type="text"
                             placeholder="What are you looking for?"
                             onChange={(e) => onQueryChange(e.target.value)}
-                            className="w-full bg-transparent border-none outline-none px-4 py-3 text-lg placeholder:text-neutral-500 font-medium"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && onSubmit) {
+                                    onSubmit();
+                                }
+                            }}
+                            className="w-full bg-transparent border-none outline-none px-3 py-2 text-base md:text-lg placeholder:text-neutral-500 font-medium"
                         />
-                        <button className="bg-foreground text-background p-3 rounded-xl hover:scale-105 transition-transform">
+                        <button
+                            onClick={onSubmit}
+                            className="bg-foreground text-background p-2 md:p-3 rounded-xl hover:scale-105 transition-transform"
+                        >
                             <ArrowRight className="w-5 h-5" />
                         </button>
                     </div>

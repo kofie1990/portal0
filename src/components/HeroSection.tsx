@@ -5,10 +5,10 @@ import Link from "next/link";
 
 export default function HeroSection() {
     return (
-        <section className="min-h-screen pt-16 grid grid-cols-1 lg:grid-cols-12 gap-0">
+        <section className="min-h-[auto] pt-16 grid grid-cols-1 lg:grid-cols-12 gap-0">
 
             {/* Left Content Area - Large Negative Space */}
-            <div className="lg:col-span-5 flex flex-col justify-center px-8 lg:pl-16 lg:pr-12 relative z-10 order-2 lg:order-1 pt-12 pb-48 lg:py-0">
+            <div className="lg:col-span-5 flex flex-col justify-start lg:justify-center px-8 lg:pl-16 lg:pr-12 relative z-10 order-2 lg:order-1 pt-32 lg:py-0 pb-12 lg:pb-24">
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}

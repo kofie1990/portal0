@@ -24,17 +24,18 @@ const ATELIER_VENDOR = {
     lat: 5.5560, // Osu coordinates
     lng: -0.1800,
     hasPhysicalLocation: true,
-    coverImage: "bg-stone-800", // Disclaimer: Using color as placeholder for now, would be url
+    coverImage: "/others/storefront.jpg",
+    imageUrl: "/others/store_2.jpg",
 };
 
 // Mock Product Data
 const PRODUCTS = [
-    { id: 1, name: "Obsidian Vase", price: "GH₵ 450", image: "bg-neutral-200" },
-    { id: 2, name: "Linen Tunic", price: "GH₵ 280", image: "bg-neutral-300" },
-    { id: 3, name: "Leather Tote", price: "GH₵ 850", image: "bg-stone-200" },
-    { id: 4, name: "Ceramic Plate Set", price: "GH₵ 320", image: "bg-zinc-200" },
-    { id: 5, name: "Woven Basket", price: "GH₵ 150", image: "bg-orange-100" },
-    { id: 6, name: "Brass Jewelry", price: "GH₵ 120", image: "bg-yellow-100" },
+    { id: 1, name: "Obsidian Vase", price: "GH₵ 450", image: "bg-neutral-200", imageUrl: "" },
+    { id: 2, name: "Linen Tunic", price: "GH₵ 280", image: "bg-neutral-300", imageUrl: "/others/clothes.jpg" },
+    { id: 3, name: "Leather Tote", price: "GH₵ 850", image: "bg-stone-200", imageUrl: "" },
+    { id: 4, name: "Ceramic Plate Set", price: "GH₵ 320", image: "bg-zinc-200", imageUrl: "/others/food_2.jpg" },
+    { id: 5, name: "Woven Basket", price: "GH₵ 150", image: "bg-orange-100", imageUrl: "" },
+    { id: 6, name: "Brass Jewelry", price: "GH₵ 120", image: "bg-yellow-100", imageUrl: "" },
 ];
 
 export default function ProductBusinessPage({ params }: { params: { id: string } }) {
@@ -46,7 +47,16 @@ export default function ProductBusinessPage({ params }: { params: { id: string }
             {ATELIER_VENDOR.hasPhysicalLocation && (
                 <div className="w-full h-[60vh] relative">
                     <div className="absolute inset-0 bg-neutral-900/20 z-10" />
-                    <div className={`w-full h-full ${ATELIER_VENDOR.coverImage} bg-cover bg-center`} />
+                    {ATELIER_VENDOR.coverImage.startsWith("/") ? (
+                        <Image
+                            src={ATELIER_VENDOR.coverImage}
+                            alt="Storefront"
+                            fill
+                            className="object-cover"
+                        />
+                    ) : (
+                        <div className={`w-full h-full ${ATELIER_VENDOR.coverImage} bg-cover bg-center`} />
+                    )}
                     <div className="absolute bottom-0 left-0 w-full p-6 z-20 bg-gradient-to-t from-black/60 to-transparent">
                         <div className="container-wide text-white">
                             <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold tracking-widest mb-2 border border-white/30">
@@ -103,11 +113,19 @@ export default function ProductBusinessPage({ params }: { params: { id: string }
                             >
                                 <div className={`aspect-[3/4] ${product.image} rounded-xl mb-4 relative overflow-hidden`}>
                                     {/* Placeholder for Product Image */}
-                                    <div className="absolute inset-0 flex items-center justify-center text-neutral-400 font-heading text-2xl font-bold opacity-30 group-hover:scale-105 transition-transform duration-700">
+                                    {product.imageUrl && (
+                                        <Image
+                                            src={product.imageUrl}
+                                            alt={product.name}
+                                            fill
+                                            className="object-cover"
+                                        />
+                                    )}
+                                    <div className="absolute inset-0 flex items-center justify-center text-neutral-400 font-heading text-2xl font-bold opacity-30 group-hover:scale-105 transition-transform duration-700 z-10">
                                         {product.name}
                                     </div>
 
-                                    <button className="absolute bottom-4 right-4 bg-white dark:bg-black text-black dark:text-white p-3 rounded-full shadow-lg translate-y-20 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                    <button className="absolute bottom-4 right-4 bg-white dark:bg-black text-black dark:text-white p-3 rounded-full shadow-lg translate-y-20 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 z-20">
                                         <ShoppingBag className="w-5 h-5" />
                                     </button>
                                 </div>

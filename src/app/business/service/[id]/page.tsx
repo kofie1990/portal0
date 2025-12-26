@@ -3,6 +3,7 @@
 import Navigation from "@/components/Navigation";
 import { motion } from "framer-motion";
 import { Star, Calendar, MapPin, CheckCircle, Clock } from "lucide-react";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import MapPlaceholder from "@/components/MapPlaceholder";
 
@@ -22,7 +23,8 @@ const BARBER_VENDOR = {
     image: "bg-black",
     lat: 5.6350, // East Legon coordinates
     lng: -0.1600,
-    coverImage: "bg-neutral-800", // Placeholder
+    coverImage: "/others/haircut_1.jpg",
+    imageUrl: "/people/person_6.jpg",
 };
 
 // Mock Service Data
@@ -41,7 +43,16 @@ export default function ServiceBusinessPage({ params }: { params: { id: string }
             {/* Cover Photo Banner */}
             <div className="w-full h-[40vh] relative mt-16">
                 <div className="absolute inset-0 bg-neutral-900/10 z-10" />
-                <div className={`w-full h-full ${BARBER_VENDOR.coverImage} bg-cover bg-center`} />
+                {BARBER_VENDOR.coverImage.startsWith("/") ? (
+                    <Image
+                        src={BARBER_VENDOR.coverImage}
+                        alt="Cover"
+                        fill
+                        className="object-cover"
+                    />
+                ) : (
+                    <div className={`w-full h-full ${BARBER_VENDOR.coverImage} bg-cover bg-center`} />
+                )}
             </div>
 
             <div className="pt-12 min-h-screen">
@@ -56,7 +67,16 @@ export default function ServiceBusinessPage({ params }: { params: { id: string }
                         >
                             <div className="w-32 h-32 bg-neutral-200 dark:bg-neutral-800 rounded-full mb-8 overflow-hidden relative">
                                 {/* Portrait Placeholder */}
-                                <div className="absolute inset-0 bg-neutral-300 dark:bg-neutral-700" />
+                                {BARBER_VENDOR.imageUrl ? (
+                                    <Image
+                                        src={BARBER_VENDOR.imageUrl}
+                                        alt="Profile"
+                                        fill
+                                        className="object-cover"
+                                    />
+                                ) : (
+                                    <div className="absolute inset-0 bg-neutral-300 dark:bg-neutral-700" />
+                                )}
                             </div>
 
                             <div className="flex items-center gap-2 text-sm font-bold tracking-wider text-neutral-500 mb-2">
