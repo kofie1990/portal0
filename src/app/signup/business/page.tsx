@@ -22,7 +22,8 @@ export default function BusinessSignupPage() {
         description: "",
         category: "",
         location: "",
-        businessType: "product", // 'product' or 'service'
+        businessType: "store", // 'store' or 'service'
+        depositFee: "",
     });
 
     const handleNext = () => {
@@ -31,8 +32,8 @@ export default function BusinessSignupPage() {
         } else {
             // Complete Setup - Route to appropriate demo page
             const route = formData.businessType === 'service'
-                ? `/business/service/demo`
-                : `/business/product/demo`;
+                ? `/business/service/barber-1`
+                : `/business/store/atelier-1`;
             router.push(route);
         }
     };
@@ -195,6 +196,17 @@ function StepDetails({ formData, setFormData }: any) {
                         <span className="text-xs font-bold bg-white dark:bg-black px-2 py-1 rounded">ENABLE LOCATION</span>
                     </button>
                 </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-bold ml-1">BOOKING DEPOSIT FEE (GH₵)</label>
+                    <input
+                        type="number"
+                        value={formData.depositFee}
+                        onChange={e => setFormData({ ...formData, depositFee: e.target.value })}
+                        className="w-full bg-neutral-50 dark:bg-neutral-900 border-none p-4 rounded-xl outline-none focus:ring-1 ring-black dark:ring-white"
+                        placeholder="e.g. 50 (Leave empty for no deposit)"
+                    />
+                    <p className="text-xs text-neutral-500 ml-1">Non-refundable fee to secure appointments.</p>
+                </div>
             </div>
         </div>
     );
@@ -210,8 +222,8 @@ function StepCustomization({ formData, setFormData }: any) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Product Variant */}
                 <div
-                    onClick={() => setFormData({ ...formData, businessType: 'product' })}
-                    className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${formData.businessType === 'product'
+                    onClick={() => setFormData({ ...formData, businessType: 'store' })}
+                    className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${formData.businessType === 'store'
                         ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
                         : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
                         }`}
@@ -226,9 +238,9 @@ function StepCustomization({ formData, setFormData }: any) {
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                         <Store className="w-4 h-4" />
-                        <span className="font-bold text-sm">Product & Retail</span>
+                        <span className="font-bold text-sm">Flagship Store</span>
                     </div>
-                    <p className="text-xs text-neutral-500">Visual-heavy grid layout optimized for showcasing items, inventory, and quick purchases.</p>
+                    <p className="text-xs text-neutral-500">For businesses with a physical location. Showcase your space and inventory.</p>
                 </div>
 
                 {/* Service Variant */}
@@ -247,9 +259,9 @@ function StepCustomization({ formData, setFormData }: any) {
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                         <Briefcase className="w-4 h-4" />
-                        <span className="font-bold text-sm">Service & Professional</span>
+                        <span className="font-bold text-sm">Mobile Service</span>
                     </div>
-                    <p className="text-xs text-neutral-500">Elegant, clean layout focused on service details, booking capabilities, and qualifications.</p>
+                    <p className="text-xs text-neutral-500">For door-to-door services or businesses without a flagship store.</p>
                 </div>
             </div>
         </div>

@@ -18,7 +18,7 @@ export default function HeroSection() {
                         Find exactly what you need.
                     </h1>
                     <p className="text-lg lg:text-xl text-neutral-500 max-w-sm mb-12 leading-relaxed">
-                        Stop searching blindly. Portal connects you directly to local vendors nearby.
+                        Stop searching blindly. Portal connects you directly to local businesses nearby.
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4">
@@ -33,7 +33,7 @@ export default function HeroSection() {
                         </button>
                         <Link href="/list">
                             <button className="border border-neutral-200 dark:border-neutral-800 px-8 py-4 text-sm font-bold tracking-wide rounded-full hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                                LIST YOUR ITEM
+                                LIST YOUR SERVICE
                             </button>
                         </Link>
                     </div>
@@ -51,10 +51,13 @@ export default function HeroSection() {
                     {/* Placeholder for the luxury visual anchor. 
                Using a premium abstract or lifestyle image. 
                For now a solid luxury gradient or Next.js Image placeholder 
-               if we had assets. I will use a generated placeholder div with style. 
+                    {/* Placeholder for the luxury visual anchor.
+               Using a premium abstract or lifestyle image.
+               For now a solid luxury gradient or Next.js Image placeholder
+               if we had assets. I will use a generated placeholder div with style.
            */}
                     <div className="absolute inset-0 bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center">
-                        {/* 
+                        {/*
                             SUGGESTION: Use a minimalist, high-contrast black & white architectural abstract.
                             Place image in public/hero-image.jpg
                          */}

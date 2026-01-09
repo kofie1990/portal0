@@ -4,9 +4,11 @@ import Navigation from "@/components/Navigation";
 import HeroSection from "@/components/HeroSection";
 import SearchInterface from "@/components/SearchInterface";
 import MapPlaceholder from "@/components/MapPlaceholder";
-import VendorList from "@/components/VendorList";
+import BusinessList from "@/components/BusinessList";
 import { useState } from "react";
-import { MOCK_VENDORS } from "@/lib/mock-data";
+import { MOCK_BUSINESSES } from "@/lib/mock-data";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react"; // Assuming lucide-react for ArrowRight
 
 import dynamic from "next/dynamic";
 
@@ -22,11 +24,11 @@ export default function Home() {
   const [category, setCategory] = useState("All");
   const [isSearching, setIsSearching] = useState(false);
 
-  const filteredVendors = MOCK_VENDORS.filter((vendor) => {
-    const matchesCategory = category === "All" || vendor.category === category;
+  const filteredBusinesses = MOCK_BUSINESSES.filter((business) => {
+    const matchesCategory = category === "All" || business.category === category;
     const matchesQuery =
-      vendor.name.toLowerCase().includes(query.toLowerCase()) ||
-      vendor.items.some(item => item.toLowerCase().includes(query.toLowerCase()));
+      business.name.toLowerCase().includes(query.toLowerCase()) ||
+      business.items.some(item => item.toLowerCase().includes(query.toLowerCase()));
 
     return matchesCategory && matchesQuery;
   });
@@ -85,7 +87,7 @@ export default function Home() {
             }`}
         >
           <div className="w-full h-full">
-            <InteractiveMap vendors={filteredVendors} />
+            <InteractiveMap businesses={filteredBusinesses} />
           </div>
 
           {/* Overlay to close search mode (Optional UX enhancement) */}
@@ -111,8 +113,17 @@ export default function Home() {
               className="relative top-full left-0 right-0 mt-0 bg-background z-20"
             >
               <div className="container-wide py-12">
-                <h3 className="font-heading text-2xl font-bold mb-6 px-4 md:px-0">Trending Nearby</h3>
-                <VendorList vendors={MOCK_VENDORS.slice(0, 4)} />
+                <div className="flex items-end justify-between mb-8">
+                  <div>
+                    <h2 className="font-heading text-3xl font-bold mb-2">Featured Businesses.</h2>
+                    <p className="text-neutral-500">Top rated local favorites near you.</p>
+                  </div>
+                  <Link href="/businesses" className="text-sm font-bold tracking-widest hover:opacity-70 transition-opacity flex items-center gap-2">
+                    VIEW ALL <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+
+                <BusinessList businesses={MOCK_BUSINESSES.slice(0, 4)} />
               </div>
             </motion.div>
           )}

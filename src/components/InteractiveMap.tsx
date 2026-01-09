@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Vendor } from "@/lib/mock-data";
+import { Business } from "@/lib/mock-data";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -17,7 +17,7 @@ const iconAnchor = new L.Icon({
 });
 
 interface InteractiveMapProps {
-    vendors: Vendor[];
+    businesses: Business[];
     center?: { lat: number; lng: number };
     zoom?: number;
 }
@@ -30,7 +30,7 @@ const MapController = ({ center, zoom }: { center: { lat: number, lng: number },
     return null;
 };
 
-export default function InteractiveMap({ vendors, center, zoom }: InteractiveMapProps) {
+export default function InteractiveMap({ businesses, center, zoom }: InteractiveMapProps) { // Changed from vendors to businesses
     // Default to Accra if no center provided
     const [mapCenter, setMapCenter] = useState(center || { lat: 5.5600, lng: -0.2057 });
     const [mapZoom, setMapZoom] = useState(zoom || 13);
@@ -57,13 +57,13 @@ export default function InteractiveMap({ vendors, center, zoom }: InteractiveMap
         return () => observer.disconnect();
     }, []);
 
-    const handleMarkerClick = (vendor: Vendor) => {
-        setMapCenter({ lat: vendor.lat, lng: vendor.lng });
+    const handleMarkerClick = (business: Business) => { // Changed from vendor: Vendor to business: Business
+        setMapCenter({ lat: business.lat, lng: business.lng }); // Changed from vendor.lat, vendor.lng to business.lat, business.lng
         setMapZoom(16); // Zoom in closer
     };
 
-    const handleGetDirections = (vendor: Vendor) => {
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${vendor.lat},${vendor.lng}`;
+    const handleGetDirections = (business: Business) => { // Changed from vendor: Vendor to business: Business
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${business.lat},${business.lng}`; // Changed from vendor.lat, vendor.lng to business.lat, business.lng
         window.open(url, '_blank');
     };
 
@@ -95,48 +95,54 @@ export default function InteractiveMap({ vendors, center, zoom }: InteractiveMap
 
                 <MapController center={mapCenter} zoom={mapZoom} />
 
-                {vendors.map((vendor) => (
+                {businesses.map((business) => ( // Changed from vendors.map((vendor) to businesses.map((business)
                     <Marker
-                        key={vendor.id}
-                        position={[vendor.lat, vendor.lng]}
+                        key={business.id} // Changed from vendor.id to business.id
+                        position={[business.lat, business.lng]} // Changed from vendor.lat, vendor.lng to business.lat, business.lng
                         icon={createCustomIcon()}
                         eventHandlers={{
-                            click: () => handleMarkerClick(vendor),
+                            click: () => handleMarkerClick(business), // Changed from vendor to business
                         }}
                     >
                         <Popup className="custom-popup" closeButton={false}>
                             <div className="p-0 min-w-[280px] font-sans overflow-hidden">
                                 {/* Header Image/Color */}
-                                <div className={`h-24 w-full ${vendor.image} relative`}>
-                                    {vendor.imageUrl && (
-                                        <img src={vendor.imageUrl} alt={vendor.name} className="w-full h-full object-cover" />
+                                <div className={`h-24 w-full ${business.image} relative`}> {/* Changed from vendor.image to business.image */}
+                                    {business.imageUrl && ( // Changed from vendor.imageUrl to business.imageUrl
+                                        <img src={business.imageUrl} alt={business.name} className="w-full h-full object-cover" /> // Changed from vendor.imageUrl, vendor.name to business.imageUrl, business.name
                                     )}
                                     <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-bold tracking-wider uppercase">
-                                        {vendor.category}
+                                        {business.category} {/* Changed from vendor.category to business.category */}
                                     </div>
                                     <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/80 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                        <span>★</span> {vendor.rating}
+                                        <span>★</span> {business.rating} {/* Changed from vendor.rating to business.rating */}
                                     </div>
                                 </div>
 
                                 <div className="p-4">
-                                    <Link href={`/profile/${vendor.id}`} className="group">
-                                        <h4 className="font-heading font-bold text-lg leading-tight mb-1 group-hover:underline underline-offset-2 decoration-2 decoration-neutral-300 transition-all">{vendor.name}</h4>
+                                    <Link href={
+                                        business.type === 'business'
+                                            ? business.businessType === 'service'
+                                                ? `/business/service/${business.id}`
+                                                : `/business/store/${business.id}`
+                                            : `/profile/${business.id}`
+                                    } className="group">
+                                        <h4 className="font-heading font-bold text-lg leading-tight mb-1 group-hover:underline underline-offset-2 decoration-2 decoration-neutral-300 transition-all">{business.name}</h4>
                                     </Link>
                                     <p className="text-xs text-neutral-500 mb-3 flex items-center gap-1">
                                         <span className="w-3 h-3 rounded-full bg-neutral-200 inline-block"></span>
-                                        {vendor.address}
+                                        {business.address}
                                     </p>
 
                                     <div className="grid grid-cols-2 gap-2 mt-4">
                                         <a
-                                            href={`tel:${vendor.phone}`}
+                                            href={`tel:${business.phone}`}
                                             className="flex items-center justify-center gap-2 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 text-xs font-bold rounded-lg transition-colors"
                                         >
                                             CONTACT
                                         </a>
                                         <button
-                                            onClick={() => handleGetDirections(vendor)}
+                                            onClick={() => handleGetDirections(business)} // Changed from vendor to business
                                             className="flex items-center justify-center gap-2 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition-colors"
                                         >
                                             DIRECTIONS

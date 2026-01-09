@@ -3,45 +3,33 @@
 import Navigation from "@/components/Navigation";
 import { motion } from "framer-motion";
 import { Star, Calendar, MapPin, CheckCircle, Clock } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import MapPlaceholder from "@/components/MapPlaceholder";
+import { MOCK_BUSINESSES } from "@/lib/mock-data";
+import { notFound } from "next/navigation";
+import { use } from "react";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
     ssr: false,
 });
 
-const BARBER_VENDOR = {
-    id: "barber-1",
-    name: "Kwame The Barber",
-    category: "Service",
-    items: ["Haircut", "Shave"],
-    location: "East Legon",
-    distance: "0km",
-    rating: 5.0,
-    image: "bg-black",
-    lat: 5.6350, // East Legon coordinates
-    lng: -0.1600,
-    coverImage: "/others/haircut_1.jpg",
-    imageUrl: "/people/person_6.jpg",
-    reviews: 214,
-    phone: "+233 55 987 6543",
-    email: "kwame@barber.com",
-    address: "East Legon, near A&C Mall",
-    type: "business" as const,
-    businessType: "service" as const,
-};
+export default function ServicePage({ params }: { params: Promise<{ id: string }> }) {
+    // Unwrap params Promise (Next.js 16+)
+    const { id } = use(params);
 
-// Mock Service Data
-const SERVICES = [
-    { name: "Signature Haircut", duration: "45 min", price: "GH₵ 150" },
-    { name: "Beard Trim & Shape", duration: "30 min", price: "GH₵ 80" },
-    { name: "Full Grooming Package", duration: "90 min", price: "GH₵ 250" },
-    { name: "Scalp Treatment", duration: "30 min", price: "GH₵ 120" },
-];
+    // Find vendor from mock data
+    const vendor = MOCK_BUSINESSES.find((v) => v.id === id);
 
-export default function ServiceBusinessPage({ params }: { params: { id: string } }) {
+    // If not found or not a service business, show 404
+    if (!vendor || vendor.type !== 'business' || vendor.businessType !== 'service') {
+        notFound();
+    }
+
+    // Get services from vendor
+    const services = vendor.services || [];
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
             <Navigation />
@@ -49,15 +37,15 @@ export default function ServiceBusinessPage({ params }: { params: { id: string }
             {/* Cover Photo Banner */}
             <div className="w-full h-[40vh] relative mt-16">
                 <div className="absolute inset-0 bg-neutral-900/10 z-10" />
-                {BARBER_VENDOR.coverImage.startsWith("/") ? (
+                {vendor.coverImage && vendor.coverImage.startsWith("/") ? (
                     <Image
-                        src={BARBER_VENDOR.coverImage}
+                        src={vendor.coverImage}
                         alt="Cover"
                         fill
                         className="object-cover"
                     />
                 ) : (
-                    <div className={`w-full h-full ${BARBER_VENDOR.coverImage} bg-cover bg-center`} />
+                    <div className={`w-full h-full ${vendor.coverImage || 'bg-neutral-200'} bg-cover bg-center`} />
                 )}
             </div>
 
@@ -73,9 +61,9 @@ export default function ServiceBusinessPage({ params }: { params: { id: string }
                         >
                             <div className="w-32 h-32 bg-neutral-200 dark:bg-neutral-800 rounded-full mb-8 overflow-hidden relative">
                                 {/* Portrait Placeholder */}
-                                {BARBER_VENDOR.imageUrl ? (
+                                {vendor.imageUrl ? (
                                     <Image
-                                        src={BARBER_VENDOR.imageUrl}
+                                        src={vendor.imageUrl}
                                         alt="Profile"
                                         fill
                                         className="object-cover"
@@ -89,35 +77,35 @@ export default function ServiceBusinessPage({ params }: { params: { id: string }
                                 <span className="flex items-center gap-1"><CheckCircle className="w-4 h-4 text-blue-500" /> VERIFIED PRO</span>
                             </div>
 
-                            <h1 className="font-heading text-5xl font-bold mb-6">Kwame The Barber.</h1>
+                            <h1 className="font-heading text-5xl font-bold mb-6">{vendor.name}.</h1>
                             <p className="text-lg text-neutral-500 mb-8 leading-relaxed">
-                                Master barber specializing in precision fades and classic cuts. Bringing over 10 years of experience from London to Accra. Dedicated to the craft of male grooming.
+                                {vendor.bio || 'Professional service provider.'}
                             </p>
 
                             <div className="space-y-4 text-sm font-medium mb-8">
                                 <div className="flex items-center gap-3">
                                     <MapPin className="w-5 h-5 text-neutral-400" />
-                                    <span>East Legon, near A&C Mall</span>
+                                    <span>{vendor.address}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Star className="w-5 h-5 fill-black dark:fill-white" />
-                                    <span>5.0 (214 Verified Reviews)</span>
+                                    <span>{vendor.rating} ({vendor.reviews || 0} Verified Reviews)</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Clock className="w-5 h-5 text-neutral-400" />
-                                    <span className="text-green-600">Available Today</span>
+                                    <span className={vendor.openNow ? "text-green-600" : "text-red-500"}>{vendor.openNow ? 'Available Today' : 'Unavailable'}</span>
                                 </div>
                             </div>
 
-                            <button className="w-full bg-foreground text-background py-4 rounded-xl font-bold tracking-wide hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 mb-8">
+                            <Link href={`/book?vendorId=${vendor.id}&type=service`} className="w-full bg-foreground text-background py-4 rounded-xl font-bold tracking-wide hover:scale-[1.02] transition-transform flex items-center justify-center gap-2 mb-8">
                                 <Calendar className="w-4 h-4" /> BOOK APPOINTMENT
-                            </button>
+                            </Link>
 
                             {/* Map in Sidebar */}
                             <div className="w-full h-[300px] rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm bg-neutral-100">
                                 <InteractiveMap
-                                    vendors={[BARBER_VENDOR]}
-                                    center={{ lat: BARBER_VENDOR.lat, lng: BARBER_VENDOR.lng }}
+                                    businesses={[vendor]}
+                                    center={{ lat: vendor.lat, lng: vendor.lng }}
                                     zoom={15}
                                 />
                             </div>
@@ -134,7 +122,7 @@ export default function ServiceBusinessPage({ params }: { params: { id: string }
                             <h3 className="font-heading text-2xl font-bold mb-8 border-b border-neutral-200 dark:border-neutral-800 pb-4">Service Menu</h3>
 
                             <div className="space-y-4">
-                                {SERVICES.map((service, index) => (
+                                {services.map((service, index) => (
                                     <div key={index} className="group p-6 rounded-2xl border border-neutral-100 dark:border-neutral-800 hover:border-black dark:hover:border-white transition-colors cursor-pointer bg-white/50 dark:bg-black/20 backdrop-blur-sm flex justify-between items-center">
                                         <div>
                                             <h4 className="font-heading text-xl font-bold mb-1">{service.name}</h4>

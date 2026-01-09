@@ -14,11 +14,8 @@ export default function MapPlaceholder() {
             />
 
             <div className="text-center z-10 p-8">
-                <h3 className="font-heading text-3xl font-bold mb-4">Explore Local Vendors</h3>
-                <p className="text-neutral-500 mb-8 max-w-md mx-auto">
-                    Our integrated map shows you exactly where to find what you need nearby.
-                    <br />(Map Integration Coming Soon)
-                </p>
+                <h3 className="font-bold text-lg mb-1">Discover Local Businesses</h3>
+                <p className="text-neutral-500 text-sm max-w-[200px]">Use the interactive map to find top rated businesses near you.</p>
                 <button className="bg-foreground text-background px-8 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-80 transition-opacity">
                     ENABLE LOCATION
                 </button>

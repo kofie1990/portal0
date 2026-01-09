@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, ShoppingBag, User, Menu, X } from "lucide-react";
+import { Search, User, Menu, X, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -43,7 +43,7 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                     {/* Desktop Navigation */}
                     <nav className="hidden md:flex gap-8 text-sm font-medium tracking-wide">
                         <Link href="/discover" className="hover:text-neutral-500 transition-colors">DISCOVER</Link>
-                        <Link href="/vendors" className="hover:text-neutral-500 transition-colors">VENDORS</Link>
+                        <Link href="/businesses" className="hover:text-neutral-500 transition-colors">BUSINESSES</Link>
                         <Link href="/services" className="hover:text-neutral-500 transition-colors">SERVICES</Link>
                     </nav>
 
@@ -57,17 +57,15 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                         </button>
 
                         <div className="hidden md:flex items-center gap-6">
-                            <Link href="/cart" className="hover:opacity-70 transition-opacity" aria-label="Cart">
-                                <ShoppingBag className="w-5 h-5" />
-                            </Link>
-
                             <Link href="/account" className="hover:opacity-70 transition-opacity" aria-label="Account">
                                 <User className="w-5 h-5" />
                             </Link>
 
-                            <button className="bg-foreground text-background px-5 py-2 text-xs font-bold tracking-wider rounded-full hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors">
-                                CHECKOUT
-                            </button>
+                            <Link href="/list">
+                                <button className="bg-foreground text-background px-5 py-2 text-xs font-bold tracking-wider rounded-full hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors flex items-center gap-2">
+                                    <Plus className="w-3 h-3" /> LIST YOUR SERVICE
+                                </button>
+                            </Link>
                         </div>
 
                         {/* Mobile Menu Toggle */}
@@ -101,11 +99,11 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                                 DISCOVER
                             </Link>
                             <Link
-                                href="/vendors"
+                                href="/businesses"
                                 className="border-b border-neutral-200 dark:border-neutral-800 pb-4"
                                 onClick={() => setIsMenuOpen(false)}
                             >
-                                VENDORS
+                                BUSINESSES
                             </Link>
                             <Link
                                 href="/services"
@@ -123,11 +121,11 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                                     <User className="w-4 h-4" /> Account
                                 </Link>
                                 <Link
-                                    href="/cart"
+                                    href="/list"
                                     className="flex items-center gap-2 text-sm opacity-70"
                                     onClick={() => setIsMenuOpen(false)}
                                 >
-                                    <ShoppingBag className="w-4 h-4" /> Cart
+                                    <Plus className="w-4 h-4" /> List Service
                                 </Link>
                             </div>
                         </nav>

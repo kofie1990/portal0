@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { MOCK_VENDORS } from "@/lib/mock-data";
+import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import Navigation from "@/components/Navigation";
 import Link from "next/link";
 import { ArrowLeft, User, MapPin, Star, Phone, Mail, ShoppingBag, Share2, Heart, CheckCircle, Clock } from "lucide-react";
@@ -17,7 +17,7 @@ const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
 
 export default function ProfilePage() {
     const params = useParams();
-    const vendor = MOCK_VENDORS.find((v) => v.id === params.id);
+    const vendor = MOCK_BUSINESSES.find((v) => v.id === params.id);
 
     if (!vendor) {
         return (

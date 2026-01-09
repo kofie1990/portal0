@@ -3,65 +3,50 @@
 import Navigation from "@/components/Navigation";
 import { motion } from "framer-motion";
 import { ShoppingBag, Star, Share2, Heart } from "lucide-react";
+import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import MapPlaceholder from "@/components/MapPlaceholder";
+import { MOCK_BUSINESSES } from "@/lib/mock-data";
+import { notFound } from "next/navigation";
+import { use } from "react";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
     ssr: false,
 });
 
-const ATELIER_VENDOR = {
-    id: "atelier-1",
-    name: "The Atelier",
-    category: "Fashion",
-    items: ["Vase", "Tunic", "Tote"],
-    location: "Osu, Accra",
-    distance: "0km",
-    rating: 4.9,
-    image: "bg-black",
-    lat: 5.5560, // Osu coordinates
-    lng: -0.1800,
-    hasPhysicalLocation: true,
-    coverImage: "/others/storefront.jpg",
-    imageUrl: "/others/store_2.jpg",
-    reviews: 128,
-    phone: "+233 55 123 4567",
-    email: "hello@theatelier.com",
-    address: "145 Osu Badu Street, Osu, Accra",
-    type: "business" as const,
-    businessType: "product" as const,
-};
+export default function StorePage({ params }: { params: Promise<{ id: string }> }) {
+    // Unwrap params Promise (Next.js 16+)
+    const { id } = use(params);
 
-// Mock Product Data
-const PRODUCTS = [
-    { id: 1, name: "Obsidian Vase", price: "GH₵ 450", image: "bg-neutral-200", imageUrl: "" },
-    { id: 2, name: "Linen Tunic", price: "GH₵ 280", image: "bg-neutral-300", imageUrl: "/others/clothes.jpg" },
-    { id: 3, name: "Leather Tote", price: "GH₵ 850", image: "bg-stone-200", imageUrl: "" },
-    { id: 4, name: "Ceramic Plate Set", price: "GH₵ 320", image: "bg-zinc-200", imageUrl: "/others/food_2.jpg" },
-    { id: 5, name: "Woven Basket", price: "GH₵ 150", image: "bg-orange-100", imageUrl: "" },
-    { id: 6, name: "Brass Jewelry", price: "GH₵ 120", image: "bg-yellow-100", imageUrl: "" },
-];
+    // Find vendor from mock data
+    const vendor = MOCK_BUSINESSES.find((v) => v.id === id);
 
-export default function ProductBusinessPage({ params }: { params: { id: string } }) {
+    // If not found or not a product business, show 404
+    if (!vendor || vendor.type !== 'business' || vendor.businessType !== 'store') {
+        notFound();
+    }
+
+    // Get products from vendor
+    const products = vendor.products || [];
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
             <Navigation />
 
             {/* Storefront Cover Photo (Conditional) */}
-            {ATELIER_VENDOR.hasPhysicalLocation && (
+            {vendor.coverImage && (
                 <div className="w-full h-[60vh] relative">
                     <div className="absolute inset-0 bg-neutral-900/20 z-10" />
-                    {ATELIER_VENDOR.coverImage.startsWith("/") ? (
+                    {vendor.coverImage.startsWith("/") ? (
                         <Image
-                            src={ATELIER_VENDOR.coverImage}
+                            src={vendor.coverImage}
                             alt="Storefront"
                             fill
                             className="object-cover"
                         />
                     ) : (
-                        <div className={`w-full h-full ${ATELIER_VENDOR.coverImage} bg-cover bg-center`} />
+                        <div className={`w-full h-full ${vendor.coverImage} bg-cover bg-center`} />
                     )}
                     <div className="absolute bottom-0 left-0 w-full p-6 z-20 bg-gradient-to-t from-black/60 to-transparent">
                         <div className="container-wide text-white">
@@ -83,14 +68,14 @@ export default function ProductBusinessPage({ params }: { params: { id: string }
                         className="flex flex-col md:flex-row justify-between items-end border-b border-neutral-200 dark:border-neutral-800 pb-8 mb-12"
                     >
                         <div>
-                            <span className="text-xs font-bold tracking-[0.2em] text-neutral-500 mb-2 block">CONCEPT STORE</span>
-                            <h1 className="font-heading text-5xl md:text-7xl font-bold mb-4">The Atelier.</h1>
+                            <span className="text-xs font-bold tracking-[0.2em] text-neutral-500 mb-2 block">{vendor.category?.toUpperCase() || 'STORE'}</span>
+                            <h1 className="font-heading text-5xl md:text-7xl font-bold mb-4">{vendor.name}.</h1>
                             <div className="flex items-center gap-4 text-sm font-medium">
-                                <span className="flex items-center gap-1"><Star className="w-4 h-4 fill-black dark:fill-white" /> 4.9 (128 Reviews)</span>
+                                <span className="flex items-center gap-1"><Star className="w-4 h-4 fill-black dark:fill-white" /> {vendor.rating} ({vendor.reviews || 0} Reviews)</span>
                                 <span className="text-neutral-400">•</span>
-                                <span>Osu, Accra</span>
+                                <span>{vendor.location}</span>
                                 <span className="text-neutral-400">•</span>
-                                <span className="text-green-600">Open Now</span>
+                                <span className={vendor.openNow ? "text-green-600" : "text-red-500"}>{vendor.openNow ? 'Open Now' : 'Closed'}</span>
                             </div>
                         </div>
                         <div className="flex gap-3 mt-6 md:mt-0">
@@ -100,15 +85,15 @@ export default function ProductBusinessPage({ params }: { params: { id: string }
                             <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
                                 <Heart className="w-5 h-5" />
                             </button>
-                            <button className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
-                                CONTACT STORE
-                            </button>
+                            <Link href={`/book?vendorId=${vendor.id}&type=store`} className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
+                                BOOK APPOINTMENT
+                            </Link>
                         </div>
                     </motion.div>
 
                     {/* Featured Collection Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-                        {PRODUCTS.map((product, index) => (
+                        {products.map((product, index) => (
                             <motion.div
                                 key={product.id}
                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -152,9 +137,7 @@ export default function ProductBusinessPage({ params }: { params: { id: string }
                             <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl">
                                 <h4 className="font-bold mb-2">Address</h4>
                                 <p className="text-neutral-500 text-sm leading-relaxed">
-                                    145 Osu Badu Street<br />
-                                    Osu, Accra<br />
-                                    Greater Accra Region
+                                    {vendor.address}
                                 </p>
                             </div>
                             <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl">
@@ -168,8 +151,8 @@ export default function ProductBusinessPage({ params }: { params: { id: string }
                         </div>
                         <div className="md:col-span-2 h-[400px] rounded-2xl overflow-hidden shadow-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-100">
                             <InteractiveMap
-                                vendors={[ATELIER_VENDOR]}
-                                center={{ lat: ATELIER_VENDOR.lat, lng: ATELIER_VENDOR.lng }}
+                                businesses={[vendor]}
+                                center={{ lat: vendor.lat, lng: vendor.lng }}
                                 zoom={15}
                             />
                         </div>

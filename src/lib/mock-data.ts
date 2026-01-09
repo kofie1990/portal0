@@ -12,7 +12,7 @@ export type Service = {
     price: string;
 };
 
-export type Vendor = {
+export type Business = {
     id: string;
     name: string;
     category: string;
@@ -31,16 +31,17 @@ export type Vendor = {
     email: string;
     address: string;
     type: 'business' | 'individual'; // 'individual' gets specific layout
-    businessType?: 'product' | 'service'; // 'business' subtypes
+    businessType?: 'store' | 'service'; // 'business' subtypes
     bio?: string;
     ownerImage?: string;
     // Richer data
     products?: Product[];
     services?: Service[];
     openNow?: boolean;
+    depositFee?: number;
 };
 
-export const MOCK_VENDORS: Vendor[] = [
+export const MOCK_BUSINESSES: Business[] = [
     {
         id: "1",
         name: "Osu Night Market Stalls",
@@ -59,8 +60,9 @@ export const MOCK_VENDORS: Vendor[] = [
         email: "contact@osunightmarket.com",
         address: "Osu Oxford Street, near Frankies",
         type: 'business',
-        businessType: 'product',
+        businessType: 'store',
         openNow: true,
+        depositFee: 20,
         bio: "Experience the vibrant nightlife and authentic flavors of Accra at the Osu Night Market. We offer a wide variety of local delicacies.",
         products: [
             { id: "p1", name: "Kenkey & Fish", price: "GH₵ 25", image: "bg-orange-200" },
@@ -86,7 +88,7 @@ export const MOCK_VENDORS: Vendor[] = [
         email: "sarah@fabrics.com",
         address: "Makola Market Lane 3, Accra Central",
         type: 'business',
-        businessType: 'product',
+        businessType: 'store',
         bio: "Madam Sarah's Fabrics has been serving the Accra community for over 20 years with high-quality authentic fabrics sourced from across West Africa.",
         products: [
             { id: "p1", name: "Authentic Kente", price: "GH₵ 800", image: "bg-red-200" },
@@ -128,7 +130,7 @@ export const MOCK_VENDORS: Vendor[] = [
         email: "info@artcenter.gh",
         address: "Centre for National Culture, Accra",
         type: 'business',
-        businessType: 'product',
+        businessType: 'store',
         coverImage: "bg-neutral-800",
         bio: "A collective of local artists showcasing the rich cultural heritage of Ghana through handmade wood carvings, paintings, and traditional jewelry.",
         products: [
@@ -155,7 +157,7 @@ export const MOCK_VENDORS: Vendor[] = [
         email: "fresh@gardencity.com",
         address: "A&C Mall Parking Lot, East Legon",
         type: 'business',
-        businessType: 'product',
+        businessType: 'store',
         bio: "Serving the freshest organic produce sourced directly from farmers in the Ashanti region. We believe in quality and sustainability.",
         products: [
             { id: "p1", name: "Organic Tomatoes (Kg)", price: "GH₵ 30", image: "bg-red-400" },
@@ -163,4 +165,80 @@ export const MOCK_VENDORS: Vendor[] = [
             { id: "p3", name: "Green Peppers (Pack)", price: "GH₵ 15", image: "bg-green-200" }
         ]
     },
+    // Demo Business: Product Store
+    {
+        id: "atelier-1",
+        name: "The Atelier",
+        category: "Fashion",
+        items: ["Vase", "Tunic", "Tote"],
+        location: "Osu, Accra",
+        distance: "0km",
+        rating: 4.9,
+        reviews: 128,
+        image: "bg-black",
+        imageUrl: "/others/store_2.jpg",
+        coverImage: "/others/storefront.jpg",
+        lat: 5.5560,
+        lng: -0.1800,
+        phone: "+233 55 123 4567",
+        email: "hello@theatelier.com",
+        address: "145 Osu Badu Street, Osu, Accra",
+        type: 'business',
+        businessType: 'store',
+        openNow: true,
+        depositFee: 150,
+        bio: "A curated concept store featuring handcrafted home goods, contemporary fashion, and artisanal accessories. We celebrate Ghanaian craftsmanship with a modern, minimalist aesthetic.",
+        products: [
+            { id: "p1", name: "Obsidian Vase", price: "GH₵ 450", image: "bg-neutral-200" },
+            { id: "p2", name: "Linen Tunic", price: "GH₵ 280", image: "bg-neutral-300", imageUrl: "/others/clothes.jpg" },
+            { id: "p3", name: "Leather Tote", price: "GH₵ 850", image: "bg-stone-200" },
+            { id: "p4", name: "Ceramic Plate Set", price: "GH₵ 320", image: "bg-zinc-200", imageUrl: "/others/food_2.jpg" },
+            { id: "p5", name: "Woven Basket", price: "GH₵ 150", image: "bg-orange-100" },
+            { id: "p6", name: "Brass Jewelry", price: "GH₵ 120", image: "bg-yellow-100" },
+        ],
+        services: [
+            { name: "Private Shopping Session", duration: "1 hr", price: "Free" },
+            { name: "Interior Styling Consultation", duration: "2 hrs", price: "GH₵ 500" },
+            { name: "Custom Order Measurement", duration: "30 min", price: "GH₵ 100" }
+        ]
+    },
+    // Demo Business: Service Provider
+    {
+        id: "barber-1",
+        name: "Kwame The Barber",
+        category: "Service",
+        items: ["Haircut", "Shave"],
+        location: "East Legon",
+        distance: "0km",
+        rating: 5.0,
+        reviews: 214,
+        image: "bg-black",
+        imageUrl: "/people/person_6.jpg",
+        coverImage: "/others/haircut_1.jpg",
+        lat: 5.6350,
+        lng: -0.1600,
+        phone: "+233 55 987 6543",
+        email: "kwame@barber.com",
+        address: "East Legon, near A&C Mall",
+        type: 'business',
+        businessType: 'service',
+        openNow: true,
+        depositFee: 50,
+        bio: "Master barber specializing in precision fades and classic cuts. Bringing over 10 years of experience from London to Accra. Dedicated to the craft of male grooming.",
+        services: [
+            { name: "Signature Haircut", duration: "45 min", price: "GH₵ 150" },
+            { name: "Beard Trim & Shape", duration: "30 min", price: "GH₵ 80" },
+            { name: "Full Grooming Package", duration: "90 min", price: "GH₵ 250" },
+            { name: "Scalp Treatment", duration: "30 min", price: "GH₵ 120" },
+        ]
+    },
+];
+
+export const MOCK_SERVICES = [
+    { id: 1, name: "Kwame The Barber", category: "Barber", location: "East Legon", image: "bg-zinc-800", imageUrl: "/others/haircut_1.jpg", price: "From GH₵ 50" },
+    { id: 2, name: "Elite Cleaning", category: "Cleaning", location: "Cantonments", image: "bg-blue-100", imageUrl: "", price: "From GH₵ 150" },
+    { id: 3, name: "FitLife Gym", category: "Fitness", location: "Airport City", image: "bg-gray-200", imageUrl: "/people/person_4.jpg", price: "Membership" },
+    { id: 4, name: "Tech Fix", category: "Repair", location: "Osu", image: "bg-blue-50", imageUrl: "", price: "Quote" },
+    { id: 5, name: "The Atelier", category: "Fashion", location: "Osu", image: "bg-neutral-200", imageUrl: "/others/storefront.jpg", price: "Custom" },
+    { id: 6, name: "Mama Kitchen", category: "Culinary", location: "Dzorwulu", image: "bg-orange-100", imageUrl: "/others/fruits.jpg", price: "Menu" },
 ];
