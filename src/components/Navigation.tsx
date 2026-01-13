@@ -1,10 +1,11 @@
-"use client";
-
+import { createClient } from "@/lib/supabase/client";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 import Link from "next/link";
 import { Search, User, Menu, X, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Image from "next/image";
 
 interface NavigationProps {
     onSearchClick?: () => void;
@@ -13,6 +14,33 @@ interface NavigationProps {
 export default function Navigation({ onSearchClick }: NavigationProps) {
     const router = useRouter();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    // Auth State
+    const [user, setUser] = useState<SupabaseUser | null>(null);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const getUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+
+            if (user) {
+                // Fetch profile avatar
+                const { data } = await supabase.from('profiles').select('avatar_url').eq('id', user.id).single();
+                if (data) setAvatarUrl(data.avatar_url);
+            }
+        };
+        getUser();
+
+        // Listen for auth changes (optional but good for UX)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user || null);
+        });
+
+        return () => subscription.unsubscribe();
+
+    }, [supabase]);
 
     const handleSearch = () => {
         if (onSearchClick) {
@@ -57,11 +85,25 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                         </button>
 
                         <div className="hidden md:flex items-center gap-6">
-                            <Link href="/account" className="hover:opacity-70 transition-opacity" aria-label="Account">
-                                <User className="w-5 h-5" />
-                            </Link>
+                            {user ? (
+                                <Link href="/account" className="hover:opacity-70 transition-opacity" aria-label="Account">
+                                    {avatarUrl ? (
+                                        <div className="w-8 h-8 rounded-full overflow-hidden border border-neutral-200 dark:border-neutral-800">
+                                            <Image src={avatarUrl} alt="Profile" width={32} height={32} className="object-cover w-full h-full" />
+                                        </div>
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center font-bold text-xs">
+                                            {user.email?.[0]?.toUpperCase()}
+                                        </div>
+                                    )}
+                                </Link>
+                            ) : (
+                                <Link href="/login" className="text-sm font-bold hover:opacity-70">
+                                    SIGN IN
+                                </Link>
+                            )}
 
-                            <Link href="/list">
+                            <Link href={user ? "/list" : "/login?redirect=/list"}>
                                 <button className="bg-foreground text-background px-5 py-2 text-xs font-bold tracking-wider rounded-full hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors flex items-center gap-2">
                                     <Plus className="w-3 h-3" /> LIST YOUR SERVICE
                                 </button>
@@ -113,15 +155,26 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                                 SERVICES
                             </Link>
                             <div className="flex gap-4 pt-4">
+                                {user ? (
+                                    <Link
+                                        href="/account"
+                                        className="flex items-center gap-2 text-sm opacity-70"
+                                        onClick={() => setIsMenuOpen(false)}
+                                    >
+                                        <User className="w-4 h-4" /> Account
+                                    </Link>
+                                ) : (
+                                    <Link
+                                        href="/login"
+                                        className="flex items-center gap-2 text-sm opacity-70"
+                                        onClick={() => setIsMenuOpen(false)}
+                                    >
+                                        <User className="w-4 h-4" /> Sign In
+                                    </Link>
+                                )}
+
                                 <Link
-                                    href="/account"
-                                    className="flex items-center gap-2 text-sm opacity-70"
-                                    onClick={() => setIsMenuOpen(false)}
-                                >
-                                    <User className="w-4 h-4" /> Account
-                                </Link>
-                                <Link
-                                    href="/list"
+                                    href={user ? "/list" : "/login?redirect=/list"}
                                     className="flex items-center gap-2 text-sm opacity-70"
                                     onClick={() => setIsMenuOpen(false)}
                                 >

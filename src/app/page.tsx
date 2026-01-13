@@ -5,7 +5,7 @@ import HeroSection from "@/components/HeroSection";
 import SearchInterface from "@/components/SearchInterface";
 import MapPlaceholder from "@/components/MapPlaceholder";
 import BusinessList from "@/components/BusinessList";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react"; // Assuming lucide-react for ArrowRight
@@ -17,18 +17,63 @@ const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
   ssr: false,
 });
 
+import { createClient } from "@/lib/supabase/client";
+
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Home() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [isSearching, setIsSearching] = useState(false);
+  const [businesses, setBusinesses] = useState<any[]>(MOCK_BUSINESSES); // Fallback to mock initially
 
-  const filteredBusinesses = MOCK_BUSINESSES.filter((business) => {
+  // Fetch real data
+
+
+  useEffect(() => {
+    const fetchBusinesses = async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.from('businesses').select('*, services(*)');
+      if (data && !error) {
+        // Map DB snake_case to Frontend camelCase
+        const mapped = data.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          category: b.category,
+          items: [], // Deprecated in favor of services
+          location: b.location_address,
+          distance: "0km", // Calc logic later
+          rating: b.rating || 0,
+          reviews: b.review_count || 0,
+          image: "bg-neutral-100", // Fallback
+          imageUrl: b.image_url,
+          coverImage: b.cover_image_url,
+          lat: b.lat,
+          lng: b.lng,
+          phone: b.phone,
+          email: b.email,
+          address: b.location_address,
+          type: b.location_type === 'physical' ? 'business' : 'individual',
+          businessType: b.location_type === 'physical' ? 'store' : 'service',
+          bio: b.bio,
+          services: b.services?.map((s: any) => ({
+            name: s.name,
+            price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
+            duration: s.duration_text
+          }))
+        }));
+        setBusinesses(mapped);
+      }
+    };
+    fetchBusinesses();
+  }, []);
+
+  const filteredBusinesses = businesses.filter((business) => {
     const matchesCategory = category === "All" || business.category === category;
     const matchesQuery =
       business.name.toLowerCase().includes(query.toLowerCase()) ||
-      business.items.some(item => item.toLowerCase().includes(query.toLowerCase()));
+      (business.items && business.items.some((item: string) => item.toLowerCase().includes(query.toLowerCase()))) ||
+      (business.services && business.services.some((svc: any) => svc.name.toLowerCase().includes(query.toLowerCase())));
 
     return matchesCategory && matchesQuery;
   });

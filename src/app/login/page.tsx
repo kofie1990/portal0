@@ -14,17 +14,30 @@ function LoginContent() {
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const [error, setError] = useState<string | null>(null);
+
+    // Import Supabase client
+    const { createClient } = require("@/lib/supabase/client");
+
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        setError(null);
 
-        // Simulate API login
-        setTimeout(() => {
+        const supabase = createClient();
+        const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (error) {
+            setError(error.message);
             setIsLoading(false);
-            // In a real app, clear auth tokens etc.
-            alert("Successfully Signed In!");
+        } else {
+            // Refresh router to update server components
+            router.refresh();
             router.push(redirectPath);
-        }, 1000);
+        }
     };
 
     return (
@@ -40,6 +53,12 @@ function LoginContent() {
 
                 <div className="glass-panel p-8 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white/50 dark:bg-black/50">
                     <form onSubmit={handleLogin} className="space-y-6">
+                        {error && (
+                            <div className="p-3 bg-red-100 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                {error}
+                            </div>
+                        )}
                         <div className="space-y-2">
                             <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><Mail className="w-4 h-4" /> EMAIL</label>
                             <input

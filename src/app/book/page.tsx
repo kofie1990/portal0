@@ -2,11 +2,12 @@
 
 import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Calendar, Clock, Check, CreditCard, Info, ChevronRight, User } from "lucide-react";
 import Image from "next/image";
 import { MOCK_BUSINESSES } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
 
 function BookingContent() {
     const searchParams = useSearchParams();
@@ -14,7 +15,48 @@ function BookingContent() {
     const vendorId = searchParams.get("vendorId");
     const serviceName = searchParams.get('service');
 
-    const vendor = MOCK_BUSINESSES.find(v => v.id === vendorId);
+    // Fetch vendor from Supabase
+    const supabase = createClient();
+    const [vendor, setVendor] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [pageError, setPageError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchVendor = async () => {
+            if (!vendorId) return;
+
+            const { data, error } = await supabase
+                .from('businesses')
+                .select('*, services(*)')
+                .eq('id', vendorId)
+                .single();
+
+            if (data && !error) {
+                setVendor({
+                    ...data,
+                    // Ensure depositFee is number
+                    depositFee: data.deposit_fee,
+                    services: data.services?.map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
+                        amount: s.price_amount, // Store raw amount for calc
+                        duration: s.duration_text
+                    }))
+                });
+            } else {
+                setPageError("Vendor not found");
+            }
+            setLoading(false);
+        };
+        fetchVendor();
+    }, [vendorId]);
+
+    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading Vendor...</div>;
+    if (pageError || !vendor) return <div className="min-h-screen flex items-center justify-center">{pageError || "Vendor not found"}</div>;
+
+
+    const services = vendor.services || [];
 
     const [step, setStep] = useState(1);
     const [selectedService, setSelectedService] = useState<any>(null);
@@ -23,21 +65,8 @@ function BookingContent() {
 
     // Generate dates dynamically
     const getAvailableDates = () => {
-        const dates = [];
         const today = new Date();
-        const currentDay = today.getDay(); // 0 is Sunday
-
-        // Calculate days until next Sunday (end of next week)
-        // Days remaining in this week (assuming week ends Saturday) + 7 days
-        // Or strictly "end of following week" usually means the Sunday of the next week
-
-        const daysUntilSunday = 7 - today.getDay();
         const outputDates = [];
-
-        // Generate from today until next week's Sunday
-        // (Days remaining in current week) + 7 days for next week
-        // Actually, let's just show the next 14 days for simplicity and good UX
-
         for (let i = 0; i < 14; i++) {
             const d = new Date(today);
             d.setDate(today.getDate() + i);
@@ -52,23 +81,60 @@ function BookingContent() {
     };
 
     const dates = getAvailableDates();
+    const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
-    const times = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"];
+    const [processing, setProcessing] = useState(false);
+    const [userDetails, setUserDetails] = useState({ name: '', phone: '', email: '' });
 
-    if (!vendor) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p>Vendor not found.</p>
-            </div>
-        );
-    }
+    const handlePayment = async () => {
+        setProcessing(true);
+        try {
+            // Calculate Amount (Deposit or Full)
+            const amountToPay = vendor.depositFee > 0 ? vendor.depositFee : selectedService.amount;
 
-    const services = vendor.services || [];
+            const res = await fetch('/api/paystack/initialize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: userDetails.email || 'guest@example.com', // Should collect email
+                    amount: amountToPay,
+                    subaccount: vendor.paystack_subaccount_code,
+                    metadata: {
+                        booking_data: {
+                            business_id: vendor.id,
+                            service_id: selectedService.id,
+                            date: selectedDate,
+                            time: selectedTime,
+                            customer_name: userDetails.name,
+                            customer_phone: userDetails.phone
+                        },
+                        vendorId: vendor.id
+                    }
+                })
+            });
+            const data = await res.json();
+            if (data.authorization_url) {
+                window.location.href = data.authorization_url;
+            } else {
+                alert("Payment initialization failed");
+                setProcessing(false);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("An error occurred");
+            setProcessing(false);
+        }
+    };
 
     const handleNext = () => {
         if (step === 1 && !selectedService) return;
         if (step === 2 && (!selectedDate || !selectedTime)) return;
-        setStep(step + 1);
+        if (step === 3) {
+            // Trigger Payment
+            handlePayment();
+        } else {
+            setStep(step + 1);
+        }
     };
 
     return (
@@ -253,15 +319,16 @@ function BookingContent() {
                                 onClick={handleNext}
                                 disabled={
                                     (step === 1 && !selectedService) ||
-                                    (step === 2 && (!selectedDate || !selectedTime))
+                                    (step === 2 && (!selectedDate || !selectedTime)) ||
+                                    processing
                                 }
-                                className={`ml-auto bg-foreground text-background px-8 py-4 rounded-full font-bold tracking-wide transition-all flex items-center gap-2 ${(step === 1 && !selectedService) || (step === 2 && (!selectedDate || !selectedTime))
+                                className={`ml-auto bg-foreground text-background px-8 py-4 rounded-full font-bold tracking-wide transition-all flex items-center gap-2 ${(step === 1 && !selectedService) || (step === 2 && (!selectedDate || !selectedTime)) || processing
                                     ? "opacity-50 cursor-not-allowed"
                                     : "hover:scale-105"
                                     }`}
                             >
-                                {step === 3 ? (vendor.depositFee ? "PAY DEPOSIT & BOOK" : "CONFIRM BOOKING") : "CONTINUE"}
-                                {step < 3 && <ChevronRight className="w-4 h-4" />}
+                                {processing ? "PROCESSING..." : step === 3 ? (vendor.depositFee ? "PAY DEPOSIT & BOOK" : "CONFIRM BOOKING") : "CONTINUE"}
+                                {step < 3 && !processing && <ChevronRight className="w-4 h-4" />}
                             </button>
                         </div>
                     </div>

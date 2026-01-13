@@ -7,12 +7,21 @@ import { ArrowRight, Check, Upload, MapPin, Smartphone, Mail, Store, Briefcase }
 import Link from "next/link";
 
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 // Steps for the wizard
 const STEPS = ["Identity", "Details", "Customization"];
 
 export default function BusinessSignupPage() {
     const router = useRouter();
+
+    // Import Supabase
+    // Import Supabase
+
+
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
     const [currentStep, setCurrentStep] = useState(0);
     const [formData, setFormData] = useState({
         email: "",
@@ -22,19 +31,67 @@ export default function BusinessSignupPage() {
         description: "",
         category: "",
         location: "",
-        businessType: "store", // 'store' or 'service'
+        businessType: "store", // 'store' (Physical) or 'service' (Mobile)
         depositFee: "",
     });
 
-    const handleNext = () => {
+    const handleNext = async () => {
         if (currentStep < STEPS.length - 1) {
             setCurrentStep(prev => prev + 1);
         } else {
-            // Complete Setup - Route to appropriate demo page
-            const route = formData.businessType === 'service'
-                ? `/business/service/barber-1`
-                : `/business/store/atelier-1`;
-            router.push(route);
+            // Complete Setup
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const supabase = createClient();
+
+                // 1. Sign Up User
+                // 1. Sign Up User (Trigger will create Profile & Business)
+                // Map UI 'businessType' to DB 'location_type'
+                const locationType = formData.businessType === 'store' ? 'physical' : 'mobile';
+
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: formData.email,
+                    password: formData.password,
+                    options: {
+                        data: {
+                            full_name: formData.businessName, // Fallback/Owner name
+                            role: 'business',
+                            phone: formData.phone,
+                            // Pass business details for the trigger
+                            business_data: {
+                                name: formData.businessName,
+                                category: formData.category || 'General',
+                                description: formData.description,
+                                location_address: formData.location || 'Accra, Ghana',
+                                location_type: locationType,
+                                deposit_fee: formData.depositFee ? parseFloat(formData.depositFee) : 0,
+                                phone: formData.phone,
+                                email: formData.email
+                            }
+                        },
+                    },
+                });
+
+                if (authError) throw authError;
+                if (!authData.user) throw new Error("No user returned");
+
+                // Manual insert removed - handled by DB trigger
+
+                if (authData.session) {
+                    // 3. Success -> Route
+                    router.refresh();
+                    router.push(`/dashboard/${authData.user.id}`);
+                } else {
+                    // Email verification required
+                    router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
+                }
+
+            } catch (err: any) {
+                setError(err.message);
+                setIsLoading(false);
+            }
         }
     };
 
@@ -60,6 +117,13 @@ export default function BusinessSignupPage() {
                             className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-black dark:bg-white -z-10 transition-all duration-500"
                             style={{ width: `${(currentStep / (STEPS.length - 1)) * 100}%` }}
                         />
+
+                        {error && (
+                            <div className="absolute -top-16 left-0 right-0 p-3 bg-red-100 border border-red-200 text-red-700 text-sm rounded-lg flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                {error}
+                            </div>
+                        )}
 
                         {STEPS.map((step, index) => (
                             <div key={step} className="flex flex-col items-center gap-2 bg-background px-2">
@@ -113,10 +177,11 @@ export default function BusinessSignupPage() {
                         </button>
                         <button
                             onClick={handleNext}
-                            className="bg-foreground text-background px-8 py-3 text-sm font-bold tracking-wide rounded-full hover:opacity-80 transition-opacity flex items-center gap-2"
+                            disabled={isLoading}
+                            className="bg-foreground text-background px-8 py-3 text-sm font-bold tracking-wide rounded-full hover:opacity-80 transition-opacity flex items-center gap-2 disabled:opacity-50"
                         >
-                            {currentStep === STEPS.length - 1 ? "COMPLETE SETUP" : "NEXT STEP"}
-                            <ArrowRight className="w-4 h-4" />
+                            {isLoading ? "CREATING..." : currentStep === STEPS.length - 1 ? "COMPLETE SETUP" : "NEXT STEP"}
+                            {!isLoading && <ArrowRight className="w-4 h-4" />}
                         </button>
                     </div>
                 </div>

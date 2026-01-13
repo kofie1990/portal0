@@ -1,19 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Star, Search, MapPin } from "lucide-react";
 import Image from "next/image";
-import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { motion } from "framer-motion";
 import Navigation from "@/components/Navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function VendorsPage() {
     const [searchQuery, setSearchQuery] = useState("");
+    const [businesses, setBusinesses] = useState<any[]>([]);
 
-    const filteredBusinesses = MOCK_BUSINESSES.filter(business =>
+    useEffect(() => {
+        const fetchBusinesses = async () => {
+            const supabase = createClient();
+            const { data } = await supabase.from('businesses').select('*');
+            if (data) {
+                const mapped = data.map((b: any) => ({
+                    id: b.id,
+                    name: b.name,
+                    category: b.category,
+                    location: b.location_address,
+                    distance: "0km",
+                    rating: b.rating || 0,
+                    reviews: b.review_count || 0,
+                    image: "bg-neutral-100",
+                    imageUrl: b.image_url,
+                    address: b.location_address,
+                    businessType: b.location_type === 'physical' ? 'store' : 'service',
+                }));
+                setBusinesses(mapped);
+            }
+        };
+        fetchBusinesses();
+    }, []);
+
+    const filteredBusinesses = businesses.filter(business =>
         business.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        business.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (business.category && business.category.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (
@@ -47,7 +72,7 @@ export default function VendorsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredBusinesses.map((business, index) => (
-                            <Link href={`/business/${business.businessType === 'store' ? 'store' : 'service'}/${business.id}`} key={business.id} className="block group">
+                            <Link href={`/business/service/${business.id}`} key={business.id} className="block group">
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}

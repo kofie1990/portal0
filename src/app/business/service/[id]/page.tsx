@@ -7,9 +7,9 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import MapPlaceholder from "@/components/MapPlaceholder";
-import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { notFound } from "next/navigation";
-import { use } from "react";
+import { use, useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
@@ -19,12 +19,56 @@ const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
 export default function ServicePage({ params }: { params: Promise<{ id: string }> }) {
     // Unwrap params Promise (Next.js 16+)
     const { id } = use(params);
+    const [vendor, setVendor] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Find vendor from mock data
-    const vendor = MOCK_BUSINESSES.find((v) => v.id === id);
+    useEffect(() => {
+        const fetchVendor = async () => {
+            const supabase = createClient();
+            const { data: b, error } = await supabase
+                .from('businesses')
+                .select('*, services(*)')
+                .eq('id', id)
+                .single();
 
-    // If not found or not a service business, show 404
-    if (!vendor || vendor.type !== 'business' || vendor.businessType !== 'service') {
+            if (b && !error) {
+                // Map DB to UI
+                setVendor({
+                    id: b.id,
+                    name: b.name,
+                    category: b.category,
+                    location: b.location_address, // Map location_address to location
+                    address: b.location_address,
+                    distance: "0km",
+                    rating: b.rating || 0,
+                    reviews: b.review_count || 0,
+                    imageUrl: b.image_url,
+                    coverImage: b.cover_image_url,
+                    lat: b.lat,
+                    lng: b.lng,
+                    bio: b.bio,
+                    openNow: b.open_now,
+                    address: b.location_address,
+                    services: b.services?.map((s: any) => ({
+                        name: s.name,
+                        price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
+                        duration: s.duration_text
+                    })) || []
+                });
+            } else {
+                setVendor(null);
+            }
+            setIsLoading(false);
+        };
+
+        if (id) fetchVendor();
+    }, [id]);
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    }
+
+    if (!vendor) {
         notFound();
     }
 

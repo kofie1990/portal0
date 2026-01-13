@@ -213,7 +213,7 @@ export default function ListPage() {
 
                             <div className="pt-6 text-center border-t border-neutral-200 dark:border-neutral-800 mt-6">
                                 <p className="text-sm text-neutral-500 mb-3">Running a full business?</p>
-                                <Link href="/login?redirect=/signup/business" className="text-sm font-bold border-b border-black dark:border-white pb-0.5 hover:opacity-70 transition-opacity">
+                                <Link href="/signup/business" className="text-sm font-bold border-b border-black dark:border-white pb-0.5 hover:opacity-70 transition-opacity">
                                     CREATE BUSINESS ACCOUNT
                                 </Link>
                             </div>
