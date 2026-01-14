@@ -4,11 +4,17 @@ import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, ExternalLink, Camera } from "lucide-react";
-import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Database } from "@/types/supabase";
+import LocationAutocomplete from "@/components/LocationAutocomplete";
+
+type Business = Database['public']['Tables']['businesses']['Row'];
+type Service = Database['public']['Tables']['services']['Row'] & {
+    businesses: { name: string } | null
+};
 
 export default function AccountPage() {
     const router = useRouter();
@@ -23,17 +29,47 @@ export default function AccountPage() {
     const [activeTab, setActiveTab] = useState("profile");
     const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-    // Fetch User Businesses
-    const [myBusinesses, setMyBusinesses] = useState<any[]>([]);
+    // Data State
+    const [myBusinesses, setMyBusinesses] = useState<Business[]>([]);
+    const [myListings, setMyListings] = useState<Service[]>([]);
 
     useEffect(() => {
-        if (activeTab === 'businesses' && user) {
-            const fetchBiz = async () => {
+        const fetchData = async () => {
+            if (!user) return;
+
+            if (activeTab === 'businesses') {
                 const { data } = await supabase.from('businesses').select('*').eq('owner_id', user.id);
                 if (data) setMyBusinesses(data);
-            };
-            fetchBiz();
-        }
+            }
+
+            if (activeTab === 'listings') {
+                // Fetch services linked to me (profile_id) OR my businesses
+                // 1. Get my business IDs first (if not already loaded, but safe to fetch again)
+                const { data: bizData } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
+                const businessIds = bizData?.map(b => b.id) || [];
+
+                // 2. Fetch services
+                // Filter: profile_id = user.id OR business_id IN (myBusinessIds)
+                let query = supabase
+                    .from('services')
+                    .select('*, businesses(name)');
+
+                if (businessIds.length > 0) {
+                    // Using 'or' syntax: "profile_id.eq.USER_ID,business_id.in.(ID1,ID2)"
+                    query = query.or(`profile_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
+                } else {
+                    // No businesses, so only individual listings
+                    query = query.eq('profile_id', user.id);
+                }
+
+                const { data: serviceData, error } = await query;
+
+                if (error) console.error("Error fetching listings:", error);
+                if (serviceData) setMyListings(serviceData as any);
+            }
+        };
+
+        fetchData();
     }, [activeTab, user, supabase]);
 
     // Fetch User on Mount
@@ -46,7 +82,6 @@ export default function AccountPage() {
                 return;
             }
 
-            console.log("Logged in as:", user.email);
             setUser(user);
 
             // Fetch Profile Details
@@ -195,7 +230,21 @@ export default function AccountPage() {
                                                                 className="w-full bg-neutral-100 dark:bg-neutral-800 border-none text-neutral-500 rounded-xl px-4 py-3 cursor-not-allowed"
                                                             />
                                                         </div>
-                                                        {/* More fields could be added if schema supports them */}
+                                                        <div className="space-y-2 col-span-1 md:col-span-2">
+                                                            <label className="text-sm font-bold text-neutral-500 uppercase tracking-wider">Location</label>
+                                                            <LocationAutocomplete
+                                                                initialValue={profile?.location_text || ""}
+                                                                onSelect={(loc) => {
+                                                                    // Update profile state locally or handle update
+                                                                    setProfile((prev: any) => ({
+                                                                        ...prev,
+                                                                        location_text: loc.address,
+                                                                        lat: loc.lat,
+                                                                        lng: loc.lng
+                                                                    }));
+                                                                }}
+                                                            />
+                                                        </div>
                                                     </div>
 
                                                     <div className="flex justify-end gap-3 pt-4">
@@ -353,39 +402,37 @@ export default function AccountPage() {
                                         </div>
 
                                         <div className="space-y-4">
-                                            {/* Mock Item 1 */}
-                                            <div className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 flex items-center gap-4">
-                                                <div className="w-16 h-16 bg-neutral-200 rounded-lg relative overflow-hidden flex-shrink-0">
-                                                    <Image src="/others/clothes.jpg" alt="Item" fill className="object-cover" />
+                                            {myListings.length === 0 ? (
+                                                <div className="text-center py-12 text-neutral-500">
+                                                    <p>You haven't listed any services yet.</p>
                                                 </div>
-                                                <div className="flex-1">
-                                                    <h4 className="font-bold">Vintage Digital Camera</h4>
-                                                    <p className="text-sm text-neutral-500">Electronics • GH₵ 850</p>
-                                                    <p className="text-xs text-neutral-400 mt-1">Listed under <span className="font-bold text-foreground">Individual</span></p>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <Link href="/list?mode=edit&id=123" className="p-2 border border-neutral-200 dark:border-neutral-800 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500">
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </Link>
-                                                </div>
-                                            </div>
-
-                                            {/* Mock Item 2 */}
-                                            <div className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 flex items-center gap-4">
-                                                <div className="w-16 h-16 bg-neutral-200 rounded-lg relative overflow-hidden flex-shrink-0">
-                                                    <Image src="/others/fruits.jpg" alt="Item" fill className="object-cover" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h4 className="font-bold">Organic Fruit Basket</h4>
-                                                    <p className="text-sm text-neutral-500">Food • GH₵ 120</p>
-                                                    <p className="text-xs text-neutral-400 mt-1">Listed under <span className="font-bold text-foreground">The Atelier</span></p>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <Link href="/list?mode=edit&id=456" className="p-2 border border-neutral-200 dark:border-neutral-800 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500">
-                                                        <Edit2 className="w-4 h-4" />
-                                                    </Link>
-                                                </div>
-                                            </div>
+                                            ) : (
+                                                myListings.map((service) => (
+                                                    <div key={service.id} className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 flex items-center gap-4">
+                                                        <div className="w-16 h-16 bg-neutral-200 rounded-lg relative overflow-hidden flex-shrink-0">
+                                                            {service.image_url ? (
+                                                                <Image src={service.image_url} alt={service.name} fill className="object-cover" />
+                                                            ) : (
+                                                                <div className="w-full h-full flex items-center justify-center bg-neutral-100 dark:bg-neutral-900 text-neutral-300">
+                                                                    <Tag className="w-6 h-6" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h4 className="font-bold">{service.name}</h4>
+                                                            <p className="text-sm text-neutral-500">{service.category || "General"} • {service.price_currency || "GH₵"} {service.price_amount}</p>
+                                                            <p className="text-xs text-neutral-400 mt-1">
+                                                                Listed under <span className="font-bold text-foreground">{service.businesses?.name || "Individual"}</span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <Link href={`/list?mode=edit&id=${service.id}`} className="p-2 border border-neutral-200 dark:border-neutral-800 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500">
+                                                                <Edit2 className="w-4 h-4" />
+                                                            </Link>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
                                         </div>
                                     </motion.div>
                                 )}

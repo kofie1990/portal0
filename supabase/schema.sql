@@ -12,7 +12,9 @@ create table profiles (
   interests text[] default '{}',
   phone text,
   bio text,
-  email text -- Copied from auth.users for easier queries if needed
+  email text, -- Copied from auth.users for easier queries if needed
+  lat double precision,
+  lng double precision
 );
 
 alter table profiles enable row level security;
@@ -81,7 +83,10 @@ create policy "Business owners can insert their business." on businesses
 create table services (
   id uuid default uuid_generate_v4() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  business_id uuid references businesses(id) on delete cascade not null,
+  
+  -- Service can belong to EITHER a business OR a user (individual)
+  business_id uuid references businesses(id) on delete cascade,
+  profile_id uuid references profiles(id) on delete cascade,
   
   name text not null,
   description text,
@@ -92,7 +97,14 @@ create table services (
   duration_text text, -- e.g. "1 hr" for display
   duration_minutes integer, -- Optional: for calculation
   
-  image_url text
+  category text,
+  image_url text,
+  location_text text, -- For individual services that have a specific location
+
+  constraint services_owner_check check (
+    (business_id is not null and profile_id is null) or 
+    (business_id is null and profile_id is not null)
+  )
 );
 
 alter table services enable row level security;
@@ -109,13 +121,20 @@ create policy "Business owners can manage their services." on services
     )
   );
 
+create policy "Individuals can manage their services." on services
+  for all using (auth.uid() = profile_id);
+
 -- BOOKINGS
 create table bookings (
   id uuid default uuid_generate_v4() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   
   user_id uuid references profiles(id) on delete cascade not null,
-  business_id uuid references businesses(id) on delete cascade not null,
+  
+  -- Booking is against a Business OR a specific Provider (Individual)
+  business_id uuid references businesses(id) on delete cascade,
+  provider_id uuid references profiles(id) on delete cascade,
+  
   service_id uuid references services(id) on delete set null,
   
   booking_date timestamp with time zone not null,
@@ -125,7 +144,12 @@ create table bookings (
   total_amount numeric not null,
   paystack_reference text,
   
-  notes text
+  notes text,
+
+  constraint bookings_target_check check (
+    (business_id is not null and provider_id is null) or 
+    (business_id is null and provider_id is not null)
+  )
 );
 
 alter table bookings enable row level security;
@@ -142,6 +166,9 @@ create policy "Business owners can view bookings for their business." on booking
     )
   );
 
+create policy "Individual providers can view their bookings." on bookings
+  for select using (auth.uid() = provider_id);
+
 create policy "Users can create bookings." on bookings
   for insert with check (auth.uid() = user_id);
 
@@ -153,11 +180,19 @@ create table reviews (
   id uuid default uuid_generate_v4() primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   
-  business_id uuid references businesses(id) on delete cascade not null,
   user_id uuid references profiles(id) on delete cascade not null,
   
+  -- Review is for a Business OR a Profile (Individual)
+  business_id uuid references businesses(id) on delete cascade,
+  reviewed_profile_id uuid references profiles(id) on delete cascade,
+  
   rating integer check (rating >= 1 and rating <= 5),
-  comment text
+  comment text,
+
+  constraint reviews_target_check check (
+    (business_id is not null and reviewed_profile_id is null) or 
+    (business_id is null and reviewed_profile_id is not null)
+  )
 );
 
 alter table reviews enable row level security;
@@ -221,3 +256,40 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- STORAGE POLICIES
+-- Ensure the bucket exists (idempotent insert not easily done in standard SQL without conflict handling, assume bucket exists per user)
+
+-- 1. Public Read Access
+create policy "Public Access"
+  on storage.objects for select
+  using ( bucket_id = 'service-images' );
+
+-- 2. Authenticated Upload Access
+create policy "Authenticated Upload"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'service-images' and
+    auth.role() = 'authenticated'
+  );
+
+-- 3. Ensure Bucket is Public (Crucial for getPublicUrl to work)
+insert into storage.buckets (id, name, public)
+values ('service-images', 'service-images', true)
+on conflict (id) do update set public = true;
+
+-- AVATARS POLICIES
+create policy "Avatar Public Access"
+  on storage.objects for select
+  using ( bucket_id = 'avatars' );
+
+create policy "Avatar Authenticated Upload"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'avatars' and
+    auth.role() = 'authenticated'
+  );
+
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do update set public = true;

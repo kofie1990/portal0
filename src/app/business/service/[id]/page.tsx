@@ -148,7 +148,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                             {/* Map in Sidebar */}
                             <div className="w-full h-[300px] rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm bg-neutral-100">
                                 <InteractiveMap
-                                    businesses={[vendor]}
+                                    items={[vendor]}
                                     center={{ lat: vendor.lat, lng: vendor.lng }}
                                     zoom={15}
                                 />
