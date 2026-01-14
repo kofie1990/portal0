@@ -131,38 +131,47 @@ export interface Database {
                 Row: {
                     id: string
                     created_at: string
-                    business_id: string
+                    business_id: string | null
+                    profile_id: string | null
                     name: string
                     description: string | null
                     price_amount: number
                     price_currency: string | null
                     duration_text: string | null
                     duration_minutes: number | null
+                    category: string | null
                     image_url: string | null
+                    location_text: string | null
                 }
                 Insert: {
                     id?: string
                     created_at?: string
-                    business_id: string
+                    business_id?: string | null
+                    profile_id?: string | null
                     name: string
                     description?: string | null
                     price_amount: number
                     price_currency?: string | null
                     duration_text?: string | null
                     duration_minutes?: number | null
+                    category?: string | null
                     image_url?: string | null
+                    location_text?: string | null
                 }
                 Update: {
                     id?: string
                     created_at?: string
-                    business_id?: string
+                    business_id?: string | null
+                    profile_id?: string | null
                     name?: string
                     description?: string | null
                     price_amount?: number
                     price_currency?: string | null
                     duration_text?: string | null
                     duration_minutes?: number | null
+                    category?: string | null
                     image_url?: string | null
+                    location_text?: string | null
                 }
             }
             bookings: {
@@ -170,7 +179,8 @@ export interface Database {
                     id: string
                     created_at: string
                     user_id: string
-                    business_id: string
+                    business_id: string | null
+                    provider_id: string | null
                     service_id: string | null
                     booking_date: string
                     status: 'pending_payment' | 'confirmed' | 'completed' | 'cancelled'
@@ -182,7 +192,8 @@ export interface Database {
                     id?: string
                     created_at?: string
                     user_id: string
-                    business_id: string
+                    business_id?: string | null
+                    provider_id?: string | null
                     service_id?: string | null
                     booking_date: string
                     status?: 'pending_payment' | 'confirmed' | 'completed' | 'cancelled'
@@ -194,7 +205,8 @@ export interface Database {
                     id?: string
                     created_at?: string
                     user_id?: string
-                    business_id?: string
+                    business_id?: string | null
+                    provider_id?: string | null
                     service_id?: string | null
                     booking_date?: string
                     status?: 'pending_payment' | 'confirmed' | 'completed' | 'cancelled'
@@ -207,7 +219,8 @@ export interface Database {
                 Row: {
                     id: string
                     created_at: string
-                    business_id: string
+                    business_id: string | null
+                    reviewed_profile_id: string | null
                     user_id: string
                     rating: number | null
                     comment: string | null
@@ -215,7 +228,8 @@ export interface Database {
                 Insert: {
                     id?: string
                     created_at?: string
-                    business_id: string
+                    business_id?: string | null
+                    reviewed_profile_id?: string | null
                     user_id: string
                     rating?: number | null
                     comment?: string | null
@@ -223,7 +237,8 @@ export interface Database {
                 Update: {
                     id?: string
                     created_at?: string
-                    business_id?: string
+                    business_id?: string | null
+                    reviewed_profile_id?: string | null
                     user_id?: string
                     rating?: number | null
                     comment?: string | null

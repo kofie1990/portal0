@@ -1,6 +1,5 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Business } from "@/lib/mock-data";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -16,8 +15,24 @@ const iconAnchor = new L.Icon({
     shadowSize: [41, 41]
 });
 
+// Generic Map Item Interface
+export type MapItem = {
+    id: string;
+    lat: number;
+    lng: number;
+    name: string;
+    image?: string; // CSS class for background color
+    imageUrl?: string | null;
+    category?: string;
+    rating?: number;
+    address?: string | null;
+    phone?: string | null;
+    type: 'business' | 'profile';
+    businessType?: 'store' | 'service'; // For businesses
+};
+
 interface InteractiveMapProps {
-    businesses: Business[];
+    items: MapItem[];
     center?: { lat: number; lng: number };
     zoom?: number;
 }
@@ -30,7 +45,7 @@ const MapController = ({ center, zoom }: { center: { lat: number, lng: number },
     return null;
 };
 
-export default function InteractiveMap({ businesses, center, zoom }: InteractiveMapProps) { // Changed from vendors to businesses
+export default function InteractiveMap({ items, center, zoom }: InteractiveMapProps) {
     // Default to Accra if no center provided
     const [mapCenter, setMapCenter] = useState(center || { lat: 5.5600, lng: -0.2057 });
     const [mapZoom, setMapZoom] = useState(zoom || 13);
@@ -57,13 +72,13 @@ export default function InteractiveMap({ businesses, center, zoom }: Interactive
         return () => observer.disconnect();
     }, []);
 
-    const handleMarkerClick = (business: Business) => { // Changed from vendor: Vendor to business: Business
-        setMapCenter({ lat: business.lat, lng: business.lng }); // Changed from vendor.lat, vendor.lng to business.lat, business.lng
+    const handleMarkerClick = (item: MapItem) => {
+        setMapCenter({ lat: item.lat, lng: item.lng });
         setMapZoom(16); // Zoom in closer
     };
 
-    const handleGetDirections = (business: Business) => { // Changed from vendor: Vendor to business: Business
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${business.lat},${business.lng}`; // Changed from vendor.lat, vendor.lng to business.lat, business.lng
+    const handleGetDirections = (item: MapItem) => {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${item.lat},${item.lng}`;
         window.open(url, '_blank');
     };
 
@@ -95,55 +110,68 @@ export default function InteractiveMap({ businesses, center, zoom }: Interactive
 
                 <MapController center={mapCenter} zoom={mapZoom} />
 
-                {businesses.map((business) => ( // Changed from vendors.map((vendor) to businesses.map((business)
+                {items.map((item) => (
                     <Marker
-                        key={business.id} // Changed from vendor.id to business.id
-                        position={[business.lat, business.lng]} // Changed from vendor.lat, vendor.lng to business.lat, business.lng
+                        key={`${item.type}-${item.id}`}
+                        position={[item.lat, item.lng]}
                         icon={createCustomIcon()}
                         eventHandlers={{
-                            click: () => handleMarkerClick(business), // Changed from vendor to business
+                            click: () => handleMarkerClick(item),
                         }}
                     >
                         <Popup className="custom-popup" closeButton={false}>
                             <div className="p-0 min-w-[280px] font-sans overflow-hidden">
                                 {/* Header Image/Color */}
-                                <div className={`h-24 w-full ${business.image} relative`}> {/* Changed from vendor.image to business.image */}
-                                    {business.imageUrl && ( // Changed from vendor.imageUrl to business.imageUrl
-                                        <img src={business.imageUrl} alt={business.name} className="w-full h-full object-cover" /> // Changed from vendor.imageUrl, vendor.name to business.imageUrl, business.name
+                                <div className={`h-24 w-full ${item.image || 'bg-neutral-200'} relative`}>
+                                    {item.imageUrl && (
+                                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                                     )}
-                                    <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-bold tracking-wider uppercase">
-                                        {business.category} {/* Changed from vendor.category to business.category */}
-                                    </div>
-                                    <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/80 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                        <span>★</span> {business.rating} {/* Changed from vendor.rating to business.rating */}
-                                    </div>
+                                    {item.category && (
+                                        <div className="absolute top-2 left-2 px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full text-[10px] font-bold tracking-wider uppercase">
+                                            {item.category}
+                                        </div>
+                                    )}
+                                    {item.rating && (
+                                        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/80 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                            <span>★</span> {item.rating}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="p-4">
                                     <Link href={
-                                        business.type === 'business'
-                                            ? business.businessType === 'service'
-                                                ? `/business/service/${business.id}`
-                                                : `/business/store/${business.id}`
-                                            : `/profile/${business.id}`
+                                        item.type === 'business'
+                                            ? item.businessType === 'service'
+                                                ? `/business/service/${item.id}`
+                                                : `/business/store/${item.id}`
+                                            : `/service/${item.id}` // Link to service profile/page? Or just profile? Assuming generic profile for now or maybe service details if context implies.
+                                        // Actually for profile type, we might want to link to their profile page or a service page contextually.
+                                        // Given the task, individual providers have 'services'. 
+                                        // Let's link to the profile page for now, or if it's a specific service marker (not yet distinguished), just profile.
+                                        // Wait, the task says "individual providers".
+                                        // Let's link to `/profile/[id]` which should be the public profile page.
+                                        // Note: Current schema links services to profiles.
+                                        // Let's assume `/profile/${item.id}` is the correct public route for a provider.
                                     } className="group">
-                                        <h4 className="font-heading font-bold text-lg leading-tight mb-1 group-hover:underline underline-offset-2 decoration-2 decoration-neutral-300 transition-all">{business.name}</h4>
+                                        <h4 className="font-heading font-bold text-lg leading-tight mb-1 group-hover:underline underline-offset-2 decoration-2 decoration-neutral-300 transition-all">{item.name}</h4>
                                     </Link>
                                     <p className="text-xs text-neutral-500 mb-3 flex items-center gap-1">
                                         <span className="w-3 h-3 rounded-full bg-neutral-200 inline-block"></span>
-                                        {business.address}
+                                        {item.address || "Location available"}
                                     </p>
 
                                     <div className="grid grid-cols-2 gap-2 mt-4">
-                                        <a
-                                            href={`tel:${business.phone}`}
-                                            className="flex items-center justify-center gap-2 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 text-xs font-bold rounded-lg transition-colors"
-                                        >
-                                            CONTACT
-                                        </a>
+                                        {item.phone && (
+                                            <a
+                                                href={`tel:${item.phone}`}
+                                                className="flex items-center justify-center gap-2 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 text-xs font-bold rounded-lg transition-colors"
+                                            >
+                                                CONTACT
+                                            </a>
+                                        )}
                                         <button
-                                            onClick={() => handleGetDirections(business)} // Changed from vendor to business
-                                            className="flex items-center justify-center gap-2 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition-colors"
+                                            onClick={() => handleGetDirections(item)}
+                                            className={`flex items-center justify-center gap-2 py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition-colors ${!item.phone ? 'col-span-2' : ''}`}
                                         >
                                             DIRECTIONS
                                         </button>

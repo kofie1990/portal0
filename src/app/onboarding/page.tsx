@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Check, MapPin, Sparkles, Camera, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
+import LocationAutocomplete from "@/components/LocationAutocomplete";
 
 // MOCK INTERESTS
 const INTERESTS = [
@@ -27,6 +28,8 @@ export default function OnboardingPage() {
 
     // Form State
     const [location, setLocation] = useState("Accra, Ghana");
+    const [lat, setLat] = useState<number | null>(null);
+    const [lng, setLng] = useState<number | null>(null);
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
     // Profile State
@@ -86,6 +89,9 @@ export default function OnboardingPage() {
                 onboarding_completed: true,
                 interests: selectedInterests,
                 bio: bio,
+                location_text: location,
+                lat: lat,
+                lng: lng,
             };
 
             if (uploadedAvatarUrl) {
@@ -128,6 +134,8 @@ export default function OnboardingPage() {
                                 key="location"
                                 location={location}
                                 setLocation={setLocation}
+                                setLat={setLat}
+                                setLng={setLng}
                                 onNext={() => setStep(2)}
                                 onBack={() => setStep(0)}
                             />
@@ -188,7 +196,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
     );
 }
 
-function StepLocation({ location, setLocation, onNext, onBack }: any) {
+function StepLocation({ location, setLocation, setLat, setLng, onNext, onBack }: any) {
     return (
         <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -201,17 +209,15 @@ function StepLocation({ location, setLocation, onNext, onBack }: any) {
 
             <div className="space-y-4 mb-10">
                 <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                    <input
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full bg-neutral-100 dark:bg-neutral-900 border-none pl-12 pr-4 py-4 rounded-xl text-lg font-medium outline-none focus:ring-2 ring-black dark:ring-white transition-all"
-                        placeholder="Enter your city..."
+                    <LocationAutocomplete
+                        initialValue={location}
+                        onSelect={(loc) => {
+                            setLocation(loc.address);
+                            setLat(loc.lat);
+                            setLng(loc.lng);
+                        }}
                     />
                 </div>
-                <button className="text-sm font-bold text-neutral-500 hover:text-black dark:hover:text-white flex items-center gap-1 ml-1">
-                    <MapPin className="w-3 h-3" /> USE MY CURRENT LOCATION
-                </button>
             </div>
 
             <div className="flex justify-between items-center">

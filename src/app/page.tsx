@@ -31,21 +31,23 @@ export default function Home() {
 
 
   useEffect(() => {
-    const fetchBusinesses = async () => {
+    const fetchToMap = async () => { // Renamed for clarity
       const supabase = createClient();
-      const { data, error } = await supabase.from('businesses').select('*, services(*)');
-      if (data && !error) {
-        // Map DB snake_case to Frontend camelCase
-        const mapped = data.map((b: any) => ({
+
+      // 1. Fetch Businesses
+      const { data: bData, error: bError } = await supabase.from('businesses').select('*, services(*)');
+      let mappedBusinesses: any[] = [];
+      if (bData && !bError) {
+        mappedBusinesses = bData.map((b: any) => ({
           id: b.id,
           name: b.name,
           category: b.category,
-          items: [], // Deprecated in favor of services
+          items: [],
           location: b.location_address,
-          distance: "0km", // Calc logic later
+          distance: "0km",
           rating: b.rating || 0,
           reviews: b.review_count || 0,
-          image: "bg-neutral-100", // Fallback
+          image: "bg-neutral-100",
           imageUrl: b.image_url,
           coverImage: b.cover_image_url,
           lat: b.lat,
@@ -53,7 +55,7 @@ export default function Home() {
           phone: b.phone,
           email: b.email,
           address: b.location_address,
-          type: b.location_type === 'physical' ? 'business' : 'individual',
+          type: 'business', // Explicitly typed
           businessType: b.location_type === 'physical' ? 'store' : 'service',
           bio: b.bio,
           services: b.services?.map((s: any) => ({
@@ -62,10 +64,37 @@ export default function Home() {
             duration: s.duration_text
           }))
         }));
-        setBusinesses(mapped);
       }
+
+      // 2. Fetch Individual Profiles (that have services or are marked as providers)
+      // Assumption: Profiles with lat/lng set are providers or at least map-able.
+      // Or we can check if they have services. Let's fetch profiles with lat/lng for now.
+      const { data: pData, error: pError } = await supabase
+        .from('profiles')
+        .select('*')
+        .not('lat', 'is', null) // Only fetch profiles with location
+        .not('lng', 'is', null);
+
+      let mappedProfiles: any[] = [];
+      if (pData && !pError) {
+        mappedProfiles = pData.map((p: any) => ({
+          id: p.id,
+          name: p.full_name || "Unnamed User", // Fallback
+          lat: p.lat,
+          lng: p.lng,
+          image: "bg-blue-100", // Different color for profiles?
+          imageUrl: p.avatar_url,
+          category: "Individual", // Or fetch from services?
+          rating: 0, // Profile rating TODO
+          address: p.location_text,
+          type: 'profile',
+          bio: p.bio
+        }));
+      }
+
+      setBusinesses([...mappedBusinesses, ...mappedProfiles]);
     };
-    fetchBusinesses();
+    fetchToMap();
   }, []);
 
   const filteredBusinesses = businesses.filter((business) => {
@@ -132,7 +161,7 @@ export default function Home() {
             }`}
         >
           <div className="w-full h-full">
-            <InteractiveMap businesses={filteredBusinesses} />
+            <InteractiveMap items={filteredBusinesses} />
           </div>
 
           {/* Overlay to close search mode (Optional UX enhancement) */}
