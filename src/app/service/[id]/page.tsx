@@ -19,6 +19,44 @@ type Review = Database['public']['Tables']['reviews']['Row'] & {
     profiles: { full_name: string; avatar_url: string } | null;
 };
 
+function ServiceImageCarousel({ images, name }: { images: string[], name: string }) {
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        if (images.length <= 1) return;
+        const interval = setInterval(() => {
+            setCurrentIndex((prev) => (prev + 1) % images.length);
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [images.length]);
+
+    return (
+        <div className="relative w-full h-full">
+            {images.map((img, idx) => (
+                <div
+                    key={idx}
+                    className={`absolute inset-0 transition-opacity duration-1000 ${idx === currentIndex ? "opacity-100" : "opacity-0"}`}
+                >
+                    <Image src={img} alt={`${name} - Image ${idx + 1}`} fill className="object-cover" />
+                </div>
+            ))}
+
+            {/* Indicators */}
+            {images.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                    {images.map((_, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => setCurrentIndex(idx)}
+                            className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex ? "bg-white w-6" : "bg-white/50 hover:bg-white/80"}`}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function ServiceDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const supabase = createClient();
@@ -134,9 +172,11 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                         {/* LEFT COLUMN: Service Info */}
                         <div className="lg:col-span-8">
 
-                            {/* Hero Image */}
-                            <div className="relative aspect-video w-full overflow-hidden rounded-3xl mb-8 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
-                                {service.image_url ? (
+                            {/* Hero Image / Carousel */}
+                            <div className="relative aspect-[4/5] md:aspect-video w-full overflow-hidden rounded-3xl mb-8 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 group">
+                                {service.images && service.images.length > 0 ? (
+                                    <ServiceImageCarousel images={service.images} name={service.name} />
+                                ) : service.image_url ? (
                                     <Image src={service.image_url} alt={service.name} fill className="object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-neutral-300">

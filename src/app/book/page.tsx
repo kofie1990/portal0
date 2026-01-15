@@ -175,7 +175,7 @@ function BookingContent() {
                                 >
                                     <h2 className="text-xl font-bold mb-6">Select a Service</h2>
                                     <div className="grid gap-4">
-                                        {services.map((service, idx) => (
+                                        {services.map((service: any, idx: number) => (
                                             <div
                                                 key={idx}
                                                 onClick={() => setSelectedService(service)}

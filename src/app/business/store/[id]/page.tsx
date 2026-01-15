@@ -151,7 +151,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                         </div>
                         <div className="md:col-span-2 h-[400px] rounded-2xl overflow-hidden shadow-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-100">
                             <InteractiveMap
-                                businesses={[vendor]}
+                                items={[vendor]}
                                 center={{ lat: vendor.lat, lng: vendor.lng }}
                                 zoom={15}
                             />

@@ -6,9 +6,8 @@ import SearchInterface from "@/components/SearchInterface";
 import MapPlaceholder from "@/components/MapPlaceholder";
 import BusinessList from "@/components/BusinessList";
 import { useState, useEffect } from "react";
-import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react"; // Assuming lucide-react for ArrowRight
+import { ArrowRight } from "lucide-react";
 
 import dynamic from "next/dynamic";
 
@@ -25,7 +24,7 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [isSearching, setIsSearching] = useState(false);
-  const [businesses, setBusinesses] = useState<any[]>(MOCK_BUSINESSES); // Fallback to mock initially
+  const [businesses, setBusinesses] = useState<any[]>([]);
 
   // Fetch real data
 
@@ -35,7 +34,13 @@ export default function Home() {
       const supabase = createClient();
 
       // 1. Fetch Businesses
-      const { data: bData, error: bError } = await supabase.from('businesses').select('*, services(*)');
+      const { data: bData, error: bError } = await supabase
+        .from('businesses')
+        .select('*, services(*)');
+
+      console.log('Fetched Businesses:', bData?.length);
+      if (bError) console.error('Error fetching businesses:', bError);
+
       let mappedBusinesses: any[] = [];
       if (bData && !bError) {
         mappedBusinesses = bData.map((b: any) => ({
@@ -67,42 +72,103 @@ export default function Home() {
       }
 
       // 2. Fetch Individual Profiles (that have services or are marked as providers)
-      // Assumption: Profiles with lat/lng set are providers or at least map-able.
-      // Or we can check if they have services. Let's fetch profiles with lat/lng for now.
       const { data: pData, error: pError } = await supabase
         .from('profiles')
-        .select('*')
-        .not('lat', 'is', null) // Only fetch profiles with location
+        .select('*, services(*)')
+        .not('lat', 'is', null)
         .not('lng', 'is', null);
 
       let mappedProfiles: any[] = [];
       if (pData && !pError) {
         mappedProfiles = pData.map((p: any) => ({
           id: p.id,
-          name: p.full_name || "Unnamed User", // Fallback
+          name: p.full_name || "Unnamed User",
           lat: p.lat,
           lng: p.lng,
-          image: "bg-blue-100", // Different color for profiles?
+          image: "bg-blue-100",
           imageUrl: p.avatar_url,
-          category: "Individual", // Or fetch from services?
-          rating: 0, // Profile rating TODO
+          category: "Individual", // Default, but can be overridden by search
+          rating: 0,
           address: p.location_text,
           type: 'profile',
-          bio: p.bio
+          bio: p.bio,
+          services: p.services?.map((s: any) => ({
+            name: s.name,
+            price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
+            description: s.description,
+            category: s.category
+          })) || []
         }));
       }
 
-      setBusinesses([...mappedBusinesses, ...mappedProfiles]);
+      // 3. Fetch Individual Services (that have explicit location set)
+      const { data: sData, error: sError } = await supabase
+        .from('services')
+        .select('*')
+        .not('lat', 'is', null)
+        .not('lng', 'is', null);
+
+      let mappedServices: any[] = [];
+      if (sData && !sError) {
+        mappedServices = sData.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          lat: s.lat,
+          lng: s.lng,
+          image: "bg-green-100",
+          imageUrl: s.image_url || (s.images && s.images[0]),
+          category: s.category,
+          rating: 0,
+          address: s.location_text,
+          type: 'business', // Treat as business type for map to link to service page
+          businessType: 'service', // Links to /business/service/[id] -> Wait this links to Business Page logic.
+          // We want to link to /service/[id].
+          // InteractiveMap logic: if type='business' & businessType='service' -> /business/service/[id]
+          // if type='profile' -> /profile/[id]
+          // We need a way to link to /service/[id].
+          // Let's check InteractiveMap again. 
+          // It links: type='business' ? ... : /profile/[id]
+          // If I use type='individual-service', I can add logic to InteractiveMap.
+        }));
+      }
+
+      // Hack for now: InteractiveMap logic needs update to support direct service links.
+      // But for now let's use type='service' (a new type) and update InteractiveMap.
+      // Retrying mapping:
+
+      if (sData && !sError) {
+        mappedServices = sData.map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          lat: s.lat,
+          lng: s.lng,
+          imageUrl: s.image_url || (s.images && s.images[0]),
+          category: s.category,
+          address: s.location_text,
+          type: 'service_item', // New custom type
+          image: "bg-purple-100"
+        }));
+      }
+
+      setBusinesses([...mappedBusinesses, ...mappedProfiles, ...mappedServices]);
     };
     fetchToMap();
   }, []);
 
   const filteredBusinesses = businesses.filter((business) => {
-    const matchesCategory = category === "All" || business.category === category;
+    // Check if any service matches the selected category (or if the business/profile itself matches)
+    const hasServiceInCategory = business.services?.some((s: any) => s.category === category);
+    const matchesCategory = category === "All" || business.category === category || hasServiceInCategory;
+
     const matchesQuery =
       business.name.toLowerCase().includes(query.toLowerCase()) ||
+      (business.address && business.address.toLowerCase().includes(query.toLowerCase())) ||
+      (business.location && business.location.toLowerCase().includes(query.toLowerCase())) ||
       (business.items && business.items.some((item: string) => item.toLowerCase().includes(query.toLowerCase()))) ||
-      (business.services && business.services.some((svc: any) => svc.name.toLowerCase().includes(query.toLowerCase())));
+      (business.services && business.services.some((svc: any) =>
+        svc.name.toLowerCase().includes(query.toLowerCase()) ||
+        svc.description?.toLowerCase().includes(query.toLowerCase())
+      ));
 
     return matchesCategory && matchesQuery;
   });
@@ -161,7 +227,7 @@ export default function Home() {
             }`}
         >
           <div className="w-full h-full">
-            <InteractiveMap items={filteredBusinesses} />
+            <InteractiveMap items={filteredBusinesses.filter(b => b.lat && b.lng)} />
           </div>
 
           {/* Overlay to close search mode (Optional UX enhancement) */}
@@ -197,7 +263,7 @@ export default function Home() {
                   </Link>
                 </div>
 
-                <BusinessList businesses={MOCK_BUSINESSES.slice(0, 4)} />
+                <BusinessList businesses={businesses.slice(0, 4)} />
               </div>
             </motion.div>
           )}

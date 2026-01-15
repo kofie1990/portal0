@@ -10,6 +10,7 @@ import { Database } from "@/types/supabase";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import Image from "next/image";
+import LocationAutocomplete from "@/components/LocationAutocomplete";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
 
@@ -21,6 +22,8 @@ export default function ListPage() {
 
     // Form State
     const [location, setLocation] = useState("");
+    const [lat, setLat] = useState<number | null>(null);
+    const [lng, setLng] = useState<number | null>(null);
     const [selectedBusiness, setSelectedBusiness] = useState("individual");
     const [category, setCategory] = useState("");
     const [email, setEmail] = useState("");
@@ -33,8 +36,8 @@ export default function ListPage() {
 
     // Image Upload State
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [imageFile, setImageFile] = useState<File | null>(null);
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [imageFiles, setImageFiles] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -60,15 +63,34 @@ export default function ListPage() {
     }, [supabase]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            if (file.size > 10 * 1024 * 1024) { // 10MB limit
-                showToast("File size too large. Max 10MB.", "error");
-                return;
-            }
-            setImageFile(file);
-            setImagePreview(URL.createObjectURL(file));
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            const newFiles = Array.from(files);
+
+            // Validate sizes
+            const validFiles = newFiles.filter(file => {
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast(`File ${file.name} is too large. Max 10MB.`, "error");
+                    return false;
+                }
+                return true;
+            });
+
+            setImageFiles(prev => [...prev, ...validFiles]);
+
+            // Create previews
+            const newPreviews = validFiles.map(file => URL.createObjectURL(file));
+            setImagePreviews(prev => [...prev, ...newPreviews]);
         }
+    };
+
+    const removeImage = (index: number) => {
+        setImageFiles(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => {
+            // Revoke object URL to avoid memory leaks
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
     };
 
     const handlePublish = async (e: React.FormEvent) => {
@@ -95,21 +117,29 @@ export default function ListPage() {
             }
 
             // 1. Upload Image if exists
-            let imageUrl = null;
-            if (imageFile) {
-                const fileExt = imageFile.name.split('.').pop();
-                const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('service-images')
-                    .upload(fileName, imageFile);
+            // 1. Upload Images if exist
+            let imageUrls: string[] = [];
 
-                if (uploadError) throw uploadError;
+            if (imageFiles.length > 0) {
+                for (const file of imageFiles) {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const { error: uploadError } = await supabase.storage
+                        .from('service-images')
+                        .upload(fileName, file);
 
-                const { data: { publicUrl } } = supabase.storage
-                    .from('service-images')
-                    .getPublicUrl(fileName);
+                    if (uploadError) {
+                        console.error("Error uploading file:", file.name, uploadError);
+                        // Continue uploading others or stop? Let's continue but log error.
+                        continue;
+                    }
 
-                imageUrl = publicUrl;
+                    const { data: { publicUrl } } = supabase.storage
+                        .from('service-images')
+                        .getPublicUrl(fileName);
+
+                    imageUrls.push(publicUrl);
+                }
             }
 
             // 2. Insert Service
@@ -124,7 +154,10 @@ export default function ListPage() {
                         description: description,
                         category: category || "Uncategorized",
                         location_text: location,
-                        image_url: imageUrl
+                        lat: lat,
+                        lng: lng,
+                        image_url: imageUrls[0] || null,
+                        images: imageUrls
                     });
 
                 if (serviceError) throw serviceError;
@@ -139,7 +172,8 @@ export default function ListPage() {
                         price_amount: parseFloat(price.replace(/[^0-9.]/g, '')),
                         description: description,
                         category: category || "Uncategorized",
-                        image_url: imageUrl
+                        image_url: imageUrls[0] || null,
+                        images: imageUrls
                     });
 
                 if (serviceError) throw serviceError;
@@ -159,19 +193,7 @@ export default function ListPage() {
         }
     };
 
-    const handleUseLocation = () => {
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition((position) => {
-                const { latitude, longitude } = position.coords;
-                setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
-            }, (error) => {
-                console.error("Error getting location:", error);
-                showToast("Could not get your location.", "error");
-            });
-        } else {
-            showToast("Geolocation is not available.", "error");
-        }
-    };
+
 
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
@@ -270,21 +292,14 @@ export default function ListPage() {
                                     <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> LOCATION</label>
                                     {selectedBusiness === "individual" ? (
                                         <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder="Accra, GH"
-                                                value={location}
-                                                onChange={(e) => setLocation(e.target.value)}
-                                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl pl-5 pr-12 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                            <LocationAutocomplete
+                                                onSelect={(loc) => {
+                                                    setLocation(loc.address);
+                                                    setLat(loc.lat);
+                                                    setLng(loc.lng);
+                                                }}
+                                                placeholder="Search for location..."
                                             />
-                                            <button
-                                                type="button"
-                                                onClick={handleUseLocation}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                                                title="Use Current Location"
-                                            >
-                                                <Navigation2 className="w-4 h-4 text-neutral-500" />
-                                            </button>
                                         </div>
                                     ) : (
                                         <div className="w-full bg-neutral-100 dark:bg-neutral-900/50 border border-dashed border-neutral-300 dark:border-neutral-700 rounded-xl px-5 py-4 text-neutral-500 italic">
@@ -323,28 +338,39 @@ export default function ListPage() {
                             )}
 
                             <div className="pt-2">
+                                <label className="text-sm font-bold tracking-wide ml-1 mb-2 block">PHOTOS (Max 5)</label>
                                 <input
                                     type="file"
                                     ref={fileInputRef}
                                     onChange={handleImageChange}
                                     accept="image/*"
+                                    multiple
                                     className="hidden"
                                 />
-                                <div
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="border-2 border-dashed border-neutral-200 dark:border-neutral-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors group relative overflow-hidden"
-                                >
-                                    {imagePreview ? (
-                                        <Image src={imagePreview} alt="Preview" fill className="object-cover opacity-50 group-hover:opacity-40 transition-opacity" />
-                                    ) : null}
 
-                                    <div className="relative z-10 flex flex-col items-center">
-                                        <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg">
-                                            <Upload className="w-5 h-5 text-neutral-500" />
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    {imagePreviews.map((preview, idx) => (
+                                        <div key={idx} className="relative aspect-square rounded-xl overflow-hidden group">
+                                            <Image src={preview} alt="Preview" fill className="object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(idx)}
+                                                className="absolute top-2 right-2 bg-black/50 hover:bg-red-500 text-white p-1 rounded-full transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                                            </button>
                                         </div>
-                                        <p className="font-medium text-sm">{imageFile ? "Change Photo" : "Upload Photo"}</p>
-                                        <p className="text-xs text-neutral-500 mt-1">{imageFile ? imageFile.name : "PNG, JPG up to 10MB"}</p>
-                                    </div>
+                                    ))}
+
+                                    {imagePreviews.length < 5 && (
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="border-2 border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors aspect-square"
+                                        >
+                                            <Upload className="w-6 h-6 text-neutral-400 mb-2" />
+                                            <span className="text-xs font-bold text-neutral-400">ADD PHOTO</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

@@ -21,6 +21,8 @@ export interface Database {
                     phone: string | null
                     bio: string | null
                     email: string | null
+                    lat: number | null
+                    lng: number | null
                 }
                 Insert: {
                     id: string
@@ -141,6 +143,7 @@ export interface Database {
                     duration_minutes: number | null
                     category: string | null
                     image_url: string | null
+                    images: string[] | null
                     location_text: string | null
                 }
                 Insert: {
@@ -156,6 +159,9 @@ export interface Database {
                     duration_minutes?: number | null
                     category?: string | null
                     image_url?: string | null
+                    images?: string[] | null
+                    lat?: number | null
+                    lng?: number | null
                     location_text?: string | null
                 }
                 Update: {
@@ -171,6 +177,9 @@ export interface Database {
                     duration_minutes?: number | null
                     category?: string | null
                     image_url?: string | null
+                    images?: string[] | null
+                    lat?: number | null
+                    lng?: number | null
                     location_text?: string | null
                 }
             }

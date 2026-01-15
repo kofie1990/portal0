@@ -3,7 +3,7 @@
 import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, ExternalLink, Camera } from "lucide-react";
+import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -426,8 +426,10 @@ export default function AccountPage() {
                                                             </p>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <Link href={`/list?mode=edit&id=${service.id}`} className="p-2 border border-neutral-200 dark:border-neutral-800 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500">
-                                                                <Edit2 className="w-4 h-4" />
+                                                            <Link href={`/service/edit/${service.id}`}>
+                                                                <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20">
+                                                                    <Edit3 className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
+                                                                </button>
                                                             </Link>
                                                         </div>
                                                     </div>

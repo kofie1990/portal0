@@ -4,18 +4,34 @@ import Navigation from "@/components/Navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 
-const PRODUCTS = [
-    { id: 1, name: "Obsidian Vase", price: "GH₵ 450", image: "bg-neutral-200", imageUrl: "" },
-    { id: 2, name: "Linen Tunic", price: "GH₵ 280", image: "bg-neutral-300", imageUrl: "/others/clothes.jpg" },
-    { id: 3, name: "Leather Tote", price: "GH₵ 850", image: "bg-stone-200", imageUrl: "" },
-    { id: 4, name: "Ceramic Plate Set", price: "GH₵ 320", image: "bg-zinc-200", imageUrl: "/others/food_2.jpg" },
-    { id: 5, name: "Woven Basket", price: "GH₵ 150", image: "bg-orange-100", imageUrl: "" },
-    { id: 6, name: "Brass Jewelry", price: "GH₵ 120", image: "bg-yellow-100", imageUrl: "" },
-    { id: 7, name: "Wooden Stool", price: "GH₵ 550", image: "bg-amber-100", imageUrl: "" },
-    { id: 8, name: "Silk Scarf", price: "GH₵ 180", image: "bg-red-100", imageUrl: "" },
-];
+import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect } from "react";
 
 export default function DiscoverPage() {
+    const [products, setProducts] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchServices = async () => {
+            const supabase = createClient();
+            const { data } = await supabase
+                .from('services')
+                .select('*')
+                .limit(20); // Limit for now
+
+            if (data) {
+                const mapped = data.map((item: any) => ({
+                    id: item.id,
+                    name: item.name,
+                    price: `${item.price_currency || 'GH₵'} ${item.price_amount}`,
+                    image: "bg-neutral-100", // Fallback background
+                    imageUrl: item.image_url || (item.images && item.images[0]) || null
+                }));
+                setProducts(mapped);
+            }
+        };
+        fetchServices();
+    }, []);
+
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
             <Navigation />
@@ -32,7 +48,7 @@ export default function DiscoverPage() {
                     </motion.div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {PRODUCTS.map((item, index) => (
+                        {products.map((item, index) => (
                             <motion.div
                                 key={item.id}
                                 initial={{ opacity: 0, y: 20 }}

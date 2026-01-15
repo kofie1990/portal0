@@ -48,7 +48,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                     lng: b.lng,
                     bio: b.bio,
                     openNow: b.open_now,
-                    address: b.location_address,
+
                     services: b.services?.map((s: any) => ({
                         name: s.name,
                         price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
@@ -166,7 +166,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                             <h3 className="font-heading text-2xl font-bold mb-8 border-b border-neutral-200 dark:border-neutral-800 pb-4">Service Menu</h3>
 
                             <div className="space-y-4">
-                                {services.map((service, index) => (
+                                {services.map((service: any, index: number) => (
                                     <div key={index} className="group p-6 rounded-2xl border border-neutral-100 dark:border-neutral-800 hover:border-black dark:hover:border-white transition-colors cursor-pointer bg-white/50 dark:bg-black/20 backdrop-blur-sm flex justify-between items-center">
                                         <div>
                                             <h4 className="font-heading text-xl font-bold mb-1">{service.name}</h4>

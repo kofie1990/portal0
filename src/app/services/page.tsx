@@ -8,7 +8,7 @@ import { Star, ArrowUpRight, Search } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 
-const CATEGORIES = ["Fashion", "Beauty", "Home", "Fitness", "Culinary", "Repair"];
+const CATEGORIES = ["Fashion", "Beauty", "Home", "Fitness", "Culinary", "Food", "Repair", "Art", "Services"];
 
 export default function ServicesPage() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -23,7 +23,7 @@ export default function ServicesPage() {
                 .select(`
                     *,
                     businesses (name, location_address, image_url),
-                    profiles (full_name, location_text, avatar_url)
+                    profiles (full_name, avatar_url)
                 `);
 
             if (data && !error) {
@@ -34,7 +34,7 @@ export default function ServicesPage() {
                     price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
                     image: "bg-neutral-100", // Fallback class
                     imageUrl: s.image_url || s.businesses?.image_url || s.profiles?.avatar_url,
-                    location: s.businesses?.location_address || s.profiles?.location_text || "Location available",
+                    location: s.location_text || s.businesses?.location_address || "Location available",
                     rating: 5.0, // Placeholder
                     providerName: s.businesses?.name || s.profiles?.full_name
                 }));

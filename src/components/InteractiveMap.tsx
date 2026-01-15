@@ -27,9 +27,10 @@ export type MapItem = {
     rating?: number;
     address?: string | null;
     phone?: string | null;
-    type: 'business' | 'profile';
+    type: 'business' | 'profile' | 'individual' | 'service_item';
     businessType?: 'store' | 'service'; // For businesses
 };
+
 
 interface InteractiveMapProps {
     items: MapItem[];
@@ -52,7 +53,25 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
     const mapRef = useRef<L.Map | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    // User Location State
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
     useEffect(() => {
+        // Get User Location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    });
+                },
+                (error) => {
+                    console.error("Error getting user location:", error);
+                }
+            );
+        }
+
         if (!containerRef.current) return;
 
         // Resize observer to handle container size changes (animation)
@@ -69,7 +88,14 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
             mapRef.current?.invalidateSize();
         }, 100);
 
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            // Cleanup map on unmount to prevent "Map container is being reused" error
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+            }
+        };
     }, []);
 
     const handleMarkerClick = (item: MapItem) => {
@@ -93,9 +119,23 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
         });
     };
 
+    // User Location Icon (Blue Dot with Pulse)
+    const createUserLocationIcon = () => {
+        return L.divIcon({
+            className: "user-location-marker",
+            html: `<div class="relative flex items-center justify-center w-6 h-6">
+            <div class="absolute w-full h-full bg-blue-500/30 rounded-full animate-ping"></div>
+            <div class="relative w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md"></div>
+        </div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+    };
+
     return (
         <div ref={containerRef} className="w-full h-full relative z-0">
             <MapContainer
+                key="interactive-map" // Force unique key
                 ref={mapRef}
                 center={mapCenter}
                 zoom={mapZoom}
@@ -109,6 +149,20 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
                 />
 
                 <MapController center={mapCenter} zoom={mapZoom} />
+
+                {/* User Location Marker */}
+                {userLocation && (
+                    <Marker
+                        position={[userLocation.lat, userLocation.lng]}
+                        icon={createUserLocationIcon()}
+                    >
+                        <Popup className="custom-popup" closeButton={false}>
+                            <div className="p-2 text-xs font-bold text-center">
+                                You are here
+                            </div>
+                        </Popup>
+                    </Marker>
+                )}
 
                 {items.map((item) => (
                     <Marker
@@ -144,14 +198,9 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
                                             ? item.businessType === 'service'
                                                 ? `/business/service/${item.id}`
                                                 : `/business/store/${item.id}`
-                                            : `/service/${item.id}` // Link to service profile/page? Or just profile? Assuming generic profile for now or maybe service details if context implies.
-                                        // Actually for profile type, we might want to link to their profile page or a service page contextually.
-                                        // Given the task, individual providers have 'services'. 
-                                        // Let's link to the profile page for now, or if it's a specific service marker (not yet distinguished), just profile.
-                                        // Wait, the task says "individual providers".
-                                        // Let's link to `/profile/[id]` which should be the public profile page.
-                                        // Note: Current schema links services to profiles.
-                                        // Let's assume `/profile/${item.id}` is the correct public route for a provider.
+                                            : item.type === 'service_item'
+                                                ? `/service/${item.id}`
+                                                : `/profile/${item.id}`
                                     } className="group">
                                         <h4 className="font-heading font-bold text-lg leading-tight mb-1 group-hover:underline underline-offset-2 decoration-2 decoration-neutral-300 transition-all">{item.name}</h4>
                                     </Link>
