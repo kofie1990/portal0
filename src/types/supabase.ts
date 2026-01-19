@@ -21,6 +21,7 @@ export interface Database {
                     phone: string | null
                     bio: string | null
                     email: string | null
+                    location_text: string | null // Added
                     lat: number | null
                     lng: number | null
                 }
@@ -35,6 +36,7 @@ export interface Database {
                     phone?: string | null
                     bio?: string | null
                     email?: string | null
+                    location_text?: string | null // Added
                 }
                 Update: {
                     id?: string
@@ -47,6 +49,7 @@ export interface Database {
                     phone?: string | null
                     bio?: string | null
                     email?: string | null
+                    location_text?: string | null // Added
                 }
             }
             businesses: {

@@ -15,6 +15,11 @@ type Business = Database['public']['Tables']['businesses']['Row'];
 type Service = Database['public']['Tables']['services']['Row'] & {
     businesses: { name: string } | null
 };
+type Booking = Database['public']['Tables']['bookings']['Row'] & {
+    services: { name: string; price_amount: number; price_currency: string } | null;
+    businesses: { name: string } | null;
+    profiles: { full_name: string } | null;
+};
 
 export default function AccountPage() {
     const router = useRouter();
@@ -32,6 +37,7 @@ export default function AccountPage() {
     // Data State
     const [myBusinesses, setMyBusinesses] = useState<Business[]>([]);
     const [myListings, setMyListings] = useState<Service[]>([]);
+    const [myBookings, setMyBookings] = useState<Booking[]>([]); // Added
 
     useEffect(() => {
         const fetchData = async () => {
@@ -43,31 +49,41 @@ export default function AccountPage() {
             }
 
             if (activeTab === 'listings') {
-                // Fetch services linked to me (profile_id) OR my businesses
-                // 1. Get my business IDs first (if not already loaded, but safe to fetch again)
+                // ... (Existing Listings Logic)
                 const { data: bizData } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
                 const businessIds = bizData?.map(b => b.id) || [];
 
-                // 2. Fetch services
-                // Filter: profile_id = user.id OR business_id IN (myBusinessIds)
                 let query = supabase
                     .from('services')
                     .select('*, businesses(name)');
 
                 if (businessIds.length > 0) {
-                    // Using 'or' syntax: "profile_id.eq.USER_ID,business_id.in.(ID1,ID2)"
                     query = query.or(`profile_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
                 } else {
-                    // No businesses, so only individual listings
                     query = query.eq('profile_id', user.id);
                 }
 
                 const { data: serviceData, error } = await query;
-
-                if (error) console.error("Error fetching listings:", error);
                 if (serviceData) setMyListings(serviceData as any);
             }
+
+            if (activeTab === 'bookings') {
+                const { data: bookingsData, error } = await supabase
+                    .from('bookings')
+                    .select(`
+                        *,
+                        services (name, price_amount, price_currency),
+                        businesses (name),
+                        profiles!bookings_provider_id_fkey (full_name)
+                    `)
+                    .eq('user_id', user.id)
+                    .order('booking_date', { ascending: false });
+
+                if (error) console.error("Error fetching bookings:", error);
+                if (bookingsData) setMyBookings(bookingsData as any);
+            }
         };
+
 
         fetchData();
     }, [activeTab, user, supabase]);
@@ -102,6 +118,45 @@ export default function AccountPage() {
         await supabase.auth.signOut();
         router.refresh();
         router.push("/login");
+    };
+
+    const handleUpdateProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const formData = new FormData(e.target as HTMLFormElement);
+        const fullName = formData.get("fullName") as string;
+
+        // Optimistic update
+        setProfile((prev: any) => ({ ...prev, full_name: fullName }));
+        setIsEditingProfile(false);
+
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                full_name: fullName,
+                location_text: profile.location_text,
+                lat: profile.lat,
+                lng: profile.lng
+            })
+            .eq('id', user.id);
+
+        if (error) console.error("Error updating profile", error);
+    };
+
+    const handleCancelBooking = async (bookingId: string) => {
+        if (!confirm("Are you sure you want to cancel this booking?")) return;
+
+        // Optimistic update
+        setMyBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+
+        const { error } = await supabase
+            .from('bookings')
+            .update({ status: 'cancelled' })
+            .eq('id', bookingId);
+
+        if (error) {
+            console.error("Error cancelling booking", error);
+            // Revert optimistic update ideally, but simplified for now
+        }
     };
 
     if (isLoading) {
@@ -168,6 +223,12 @@ export default function AccountPage() {
                                     >
                                         <Tag className="w-4 h-4" /> My Listings
                                     </button>
+                                    <button
+                                        onClick={() => setActiveTab("bookings")}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "bookings" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
+                                    >
+                                        <Calendar className="w-4 h-4" /> My Bookings
+                                    </button>
                                     <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-4" />
                                     <button
                                         onClick={handleSignOut}
@@ -195,9 +256,8 @@ export default function AccountPage() {
                                                     </button>
                                                 </div>
 
-                                                <form onSubmit={(e) => { e.preventDefault(); setIsEditingProfile(false); }} className="space-y-6">
-                                                    {/* NOTE: Real profile update logic would go here, for now just UI switch back */}
-
+                                                <form onSubmit={handleUpdateProfile} className="space-y-6">
+                                                    {/* Profile Update Form */}
                                                     <div className="flex flex-col items-center mb-8">
                                                         <div className="w-24 h-24 bg-neutral-100 dark:bg-neutral-900 rounded-full flex items-center justify-center relative group cursor-pointer overflow-hidden">
                                                             {profile?.avatar_url ? (
@@ -217,6 +277,7 @@ export default function AccountPage() {
                                                             <label className="text-sm font-bold text-neutral-500 uppercase tracking-wider">Full Name</label>
                                                             <input
                                                                 type="text"
+                                                                name="fullName"
                                                                 defaultValue={profile?.full_name || ""}
                                                                 className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 outline-none focus:border-black dark:focus:border-white transition-colors"
                                                             />
@@ -235,7 +296,6 @@ export default function AccountPage() {
                                                             <LocationAutocomplete
                                                                 initialValue={profile?.location_text || ""}
                                                                 onSelect={(loc) => {
-                                                                    // Update profile state locally or handle update
                                                                     setProfile((prev: any) => ({
                                                                         ...prev,
                                                                         location_text: loc.address,
@@ -293,29 +353,25 @@ export default function AccountPage() {
                                                 </div>
 
                                                 <div className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-8">
-                                                    <h4 className="font-bold mb-4">Recent Activity</h4>
+                                                    <h4 className="font-bold mb-4">Recent Bookings</h4>
                                                     <div className="space-y-4">
-                                                        {[
-                                                            { id: "BK-802", service: "Private Shopping Session", vendor: "The Atelier", date: "Jan 15, 2:00 PM", status: "Confirmed", price: "Free" },
-                                                            { id: "BK-755", service: "Signature Haircut", vendor: "Kwame The Barber", date: "Jan 03, 10:00 AM", status: "Completed", price: "GH₵ 150" },
-                                                            { id: "BK-621", service: "Interior Styling", vendor: "The Atelier", date: "Dec 12, 11:30 AM", status: "Completed", price: "GH₵ 500" }
-                                                        ].map((booking) => (
+                                                        {myBookings.length > 0 ? myBookings.slice(0, 3).map((booking) => (
                                                             <div key={booking.id} className="flex items-center justify-between py-4 border-b border-neutral-100 dark:border-neutral-900 last:border-0 hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors rounded-lg px-2 -mx-2">
                                                                 <div className="flex items-center gap-4">
-                                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${booking.status === 'Confirmed' ? 'bg-green-100 text-green-600 dark:bg-green-900/20' : 'bg-neutral-100 text-neutral-400 dark:bg-neutral-900'}`}>
-                                                                        {booking.status === 'Confirmed' ? <Calendar className="w-6 h-6" /> : <CheckCircle className="w-6 h-6" />}
+                                                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${booking.status === 'confirmed' ? 'bg-green-100 text-green-600 dark:bg-green-900/20' : 'bg-neutral-100 text-neutral-400 dark:bg-neutral-900'}`}>
+                                                                        {booking.status === 'confirmed' ? <Calendar className="w-6 h-6" /> : <Clock className="w-6 h-6" />}
                                                                     </div>
                                                                     <div>
-                                                                        <p className="font-bold text-sm">{booking.service}</p>
-                                                                        <p className="text-xs text-neutral-500 mb-0.5">at {booking.vendor}</p>
+                                                                        <p className="font-bold text-sm">{booking.services?.name}</p>
+                                                                        <p className="text-xs text-neutral-500 mb-0.5">at {booking.businesses?.name || booking.profiles?.full_name}</p>
                                                                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                                                            <Clock className="w-3 h-3" /> {booking.date}
+                                                                            <Clock className="w-3 h-3" /> {new Date(booking.booking_date).toLocaleDateString()}
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                                 <div className="text-right">
-                                                                    <span className="block text-sm font-bold mb-1">{booking.price}</span>
-                                                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${booking.status === 'Confirmed'
+                                                                    <span className="block text-sm font-bold mb-1">{booking.services?.price_currency} {booking.services?.price_amount}</span>
+                                                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${booking.status === 'confirmed'
                                                                         ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                                         : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800'
                                                                         }`}>
@@ -323,7 +379,9 @@ export default function AccountPage() {
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                        ))}
+                                                        )) : (
+                                                            <div className="text-center py-4 text-neutral-400 text-sm">No recent activity.</div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </>

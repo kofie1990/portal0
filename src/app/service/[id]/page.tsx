@@ -316,12 +316,18 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                                     <h3 className="font-heading text-2xl font-bold mb-2">Ready to book?</h3>
                                     <p className="text-white/70 dark:text-black/70 mb-8 text-sm">Select a time that works for you.</p>
 
-                                    <button className="w-full bg-white dark:bg-black text-black dark:text-white py-4 rounded-xl font-bold tracking-wide hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 mb-3">
-                                        <Calendar className="w-4 h-4" /> REQUEST BOOKING
-                                    </button>
+                                    <Link href={`/book/${id}`}>
+                                        <button className="w-full bg-white dark:bg-black text-black dark:text-white py-4 rounded-xl font-bold tracking-wide hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg flex items-center justify-center gap-2 mb-3">
+                                            <Calendar className="w-4 h-4" /> REQUEST BOOKING
+                                        </button>
+                                    </Link>
 
                                     <p className="text-center text-[10px] text-white/50 dark:text-black/50 font-medium">
-                                        {service.price_currency} {service.price_amount} will be held upon confirmation.
+                                        {service.deposit_amount ? (
+                                            `You will be charged a deposit of ${service.price_currency || 'GH₵'} ${service.deposit_amount} to confirm.`
+                                        ) : (
+                                            `Full amount of ${service.price_currency || 'GH₵'} ${service.price_amount} to be paid later.`
+                                        )}
                                     </p>
                                 </div>
 
