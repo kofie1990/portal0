@@ -155,7 +155,6 @@ export default function ListPage() {
                 return;
             }
 
-            // 1. Upload Image if exists
             // 1. Upload Images if exist
             let imageUrls: string[] = [];
 
