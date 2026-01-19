@@ -145,6 +145,7 @@ export interface Database {
                     image_url: string | null
                     images: string[] | null
                     location_text: string | null
+                    deposit_amount: number | null // Added
                 }
                 Insert: {
                     id?: string
@@ -163,6 +164,7 @@ export interface Database {
                     lat?: number | null
                     lng?: number | null
                     location_text?: string | null
+                    deposit_amount?: number | null // Added
                 }
                 Update: {
                     id?: string
@@ -181,6 +183,7 @@ export interface Database {
                     lat?: number | null
                     lng?: number | null
                     location_text?: string | null
+                    deposit_amount?: number | null // Added
                 }
             }
             bookings: {
@@ -196,6 +199,7 @@ export interface Database {
                     total_amount: number
                     paystack_reference: string | null
                     notes: string | null
+                    amount_paid: number | null // Added
                 }
                 Insert: {
                     id?: string
@@ -209,6 +213,7 @@ export interface Database {
                     total_amount: number
                     paystack_reference?: string | null
                     notes?: string | null
+                    amount_paid?: number | null // Added
                 }
                 Update: {
                     id?: string
@@ -222,6 +227,7 @@ export interface Database {
                     total_amount?: number
                     paystack_reference?: string | null
                     notes?: string | null
+                    amount_paid?: number | null // Added
                 }
             }
             reviews: {

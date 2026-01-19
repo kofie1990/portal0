@@ -15,9 +15,10 @@ interface LocationAutocompleteProps {
     initialValue?: string;
     placeholder?: string;
     className?: string;
+    required?: boolean;
 }
 
-export default function LocationAutocomplete({ onSelect, initialValue = "", placeholder = "Search for a location...", className = "" }: LocationAutocompleteProps) {
+export default function LocationAutocomplete({ onSelect, initialValue = "", placeholder = "Search for a location...", className = "", required = false }: LocationAutocompleteProps) {
     const [query, setQuery] = useState(initialValue);
     const [results, setResults] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -51,26 +52,48 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
         setIsLoading(true);
         try {
             // Using OpenStreetMap Nominatim API
+            // Note: Nominatim usage policy requires a valid User-Agent
             const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5`,
+                {
+                    headers: {
+                        "User-Agent": "PortalApp/1.0",
+                        "Accept-Language": "en-US,en;q=0.9"
+                    }
+                }
             );
+
+            if (!response.ok) {
+                // If 503 or other error, fallback or throw
+                throw new Error(`Location service error: ${response.status}`);
+            }
+
             const data = await response.json();
-            setResults(data);
+            setResults(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error("Error searching location:", error);
             setResults([]);
+            // Optional: show a toast or small error UI for "Location service busy"
         } finally {
             setIsLoading(false);
         }
     };
 
+    const shortenAddress = (fullAddress: string) => {
+        // Init with first 3 parts
+        const parts = fullAddress.split(',').map(p => p.trim());
+        if (parts.length <= 3) return fullAddress;
+        return parts.slice(0, 3).join(', ');
+    };
+
     const handleSelect = (item: any) => {
+        const shortAddress = shortenAddress(item.display_name);
         const location: Location = {
             lat: parseFloat(item.lat),
             lng: parseFloat(item.lon),
-            address: item.display_name
+            address: shortAddress
         };
-        setQuery(item.display_name);
+        setQuery(shortAddress);
         onSelect(location);
         setIsOpen(false);
     };
@@ -83,14 +106,22 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
                 try {
                     // Reverse geocoding
                     const response = await fetch(
-                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+                        {
+                            headers: {
+                                "User-Agent": "PortalApp/1.0"
+                            }
+                        }
                     );
                     const data = await response.json();
+
+                    const fullAddress = data.display_name || `${latitude}, ${longitude}`;
+                    const shortAddress = shortenAddress(fullAddress);
 
                     const location: Location = {
                         lat: latitude,
                         lng: longitude,
-                        address: data.display_name || `${latitude}, ${longitude}`
+                        address: shortAddress
                     };
 
                     setQuery(location.address);
@@ -114,6 +145,7 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
                 <input
                     type="text"
+                    required={required}
                     value={query}
                     onChange={(e) => {
                         setQuery(e.target.value);

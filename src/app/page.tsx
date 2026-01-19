@@ -101,56 +101,10 @@ export default function Home() {
         }));
       }
 
-      // 3. Fetch Individual Services (that have explicit location set)
-      const { data: sData, error: sError } = await supabase
-        .from('services')
-        .select('*')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null);
+      // 3. Fetch Individual Services - REMOVED as per user request to only show businesses and profiles on map.
+      // const { data: sData, error: sError } = await supabase...
 
-      let mappedServices: any[] = [];
-      if (sData && !sError) {
-        mappedServices = sData.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          lat: s.lat,
-          lng: s.lng,
-          image: "bg-green-100",
-          imageUrl: s.image_url || (s.images && s.images[0]),
-          category: s.category,
-          rating: 0,
-          address: s.location_text,
-          type: 'business', // Treat as business type for map to link to service page
-          businessType: 'service', // Links to /business/service/[id] -> Wait this links to Business Page logic.
-          // We want to link to /service/[id].
-          // InteractiveMap logic: if type='business' & businessType='service' -> /business/service/[id]
-          // if type='profile' -> /profile/[id]
-          // We need a way to link to /service/[id].
-          // Let's check InteractiveMap again. 
-          // It links: type='business' ? ... : /profile/[id]
-          // If I use type='individual-service', I can add logic to InteractiveMap.
-        }));
-      }
-
-      // Hack for now: InteractiveMap logic needs update to support direct service links.
-      // But for now let's use type='service' (a new type) and update InteractiveMap.
-      // Retrying mapping:
-
-      if (sData && !sError) {
-        mappedServices = sData.map((s: any) => ({
-          id: s.id,
-          name: s.name,
-          lat: s.lat,
-          lng: s.lng,
-          imageUrl: s.image_url || (s.images && s.images[0]),
-          category: s.category,
-          address: s.location_text,
-          type: 'service_item', // New custom type
-          image: "bg-purple-100"
-        }));
-      }
-
-      setBusinesses([...mappedBusinesses, ...mappedProfiles, ...mappedServices]);
+      setBusinesses([...mappedBusinesses, ...mappedProfiles]); // Removed mappedServices
     };
     fetchToMap();
   }, []);
@@ -162,6 +116,7 @@ export default function Home() {
 
     const matchesQuery =
       business.name.toLowerCase().includes(query.toLowerCase()) ||
+      (business.bio && business.bio.toLowerCase().includes(query.toLowerCase())) || // Added Bio Filtering
       (business.address && business.address.toLowerCase().includes(query.toLowerCase())) ||
       (business.location && business.location.toLowerCase().includes(query.toLowerCase())) ||
       (business.items && business.items.some((item: string) => item.toLowerCase().includes(query.toLowerCase()))) ||
@@ -263,7 +218,7 @@ export default function Home() {
                   </Link>
                 </div>
 
-                <BusinessList businesses={businesses.slice(0, 4)} />
+                <BusinessList businesses={businesses.filter(b => b.type === 'business').slice(0, 4)} />
               </div>
             </motion.div>
           )}

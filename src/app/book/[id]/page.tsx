@@ -1,0 +1,192 @@
+"use client";
+
+import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { ArrowLeft, Calendar, Clock, MapPin, ShieldCheck, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
+import Navigation from "@/components/Navigation";
+
+export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params);
+    const router = useRouter();
+    const supabase = createClient();
+    const { showToast } = useToast();
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [isBooking, setIsBooking] = useState(false);
+    const [service, setService] = useState<any>(null);
+    const [bookingDate, setBookingDate] = useState("");
+
+    useEffect(() => {
+        const fetchService = async () => {
+            const { data, error } = await supabase
+                .from('services')
+                .select('*, businesses(name, id), profiles(full_name, id)')
+                .eq('id', id)
+                .single();
+
+            if (error) {
+                console.error(error);
+                showToast("Service not found", "error");
+                router.push("/");
+                return;
+            }
+            setService(data);
+            setIsLoading(false);
+        };
+        fetchService();
+    }, [id, supabase, router, showToast]);
+
+    const handleBooking = async () => {
+        if (!bookingDate) {
+            showToast("Please select a date and time.", "error");
+            return;
+        }
+
+        setIsBooking(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                showToast("Please login to book.", "error");
+                router.push("/auth");
+                return;
+            }
+
+            const deposit = service.deposit_amount || 0;
+            const total = service.price_amount;
+
+            // Create Booking
+            const { error } = await supabase.from('bookings').insert({
+                user_id: user.id,
+                service_id: service.id,
+                business_id: service.business_id,
+                provider_id: service.profile_id,
+                booking_date: new Date(bookingDate).toISOString(),
+                status: 'confirmed', // Auto-confirm for now as "payment" is mocked
+                total_amount: total,
+                amount_paid: deposit,
+                notes: "Booking via Portal"
+            });
+
+            if (error) throw error;
+
+            showToast("Booking Confirmed!", "success");
+            router.push("/account"); // Redirect to account/bookings page later
+        } catch (error: any) {
+            console.error(error);
+            showToast(error.message || "Booking failed", "error");
+        } finally {
+            setIsBooking(false);
+        }
+    };
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-neutral-400" /></div>;
+    }
+
+    if (!service) return null;
+
+    const depositAmount = service.deposit_amount || 0;
+    const remainingAmount = service.price_amount - depositAmount;
+
+    return (
+        <main className="min-h-screen bg-background text-foreground font-sans">
+            <Navigation />
+            <div className="pt-28 pb-20 container-wide max-w-4xl mx-auto px-6">
+
+                <Link href={`/service/${id}`} className="inline-flex items-center gap-2 text-sm font-bold text-neutral-500 hover:text-black dark:hover:text-white transition-colors mb-8">
+                    <ArrowLeft className="w-4 h-4" /> Back to Service
+                </Link>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    {/* Left: Service Details */}
+                    <div className="space-y-8">
+                        <div>
+                            <span className="text-xs font-bold tracking-wider text-neutral-500 uppercase mb-2 block">{service.category}</span>
+                            <h1 className="text-4xl font-heading font-bold mb-4">{service.name}</h1>
+                            <div className="flex items-center gap-2 text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                                {service.businesses?.name || service.profiles?.full_name}
+                            </div>
+                        </div>
+
+                        <div className="aspect-video relative rounded-3xl overflow-hidden bg-neutral-100 dark:bg-neutral-800">
+                            {(service.image_url || (service.images && service.images[0])) ? (
+                                <Image src={service.image_url || service.images[0]} alt={service.name} fill className="object-cover" />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-neutral-400">No Image</div>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col gap-4 p-6 bg-neutral-50 dark:bg-neutral-900 rounded-2xl border border-neutral-100 dark:border-neutral-800">
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                                    <ShieldCheck className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-sm">Secure Booking</h3>
+                                    <p className="text-xs text-neutral-500 mt-1">Your deposit is held securely until the booking is confirmed.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right: Booking Form */}
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-3xl p-8 shadow-xl">
+                            <h2 className="font-heading text-xl font-bold mb-6">Confirm Booking</h2>
+
+                            <div className="space-y-6">
+                                {/* Date Picker Mock */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold ml-1">Select Date & Time</label>
+                                    <input
+                                        type="datetime-local"
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-black dark:ring-white transition-all"
+                                        onChange={(e) => setBookingDate(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Price Breakdown */}
+                                <div className="space-y-3 py-6 border-t border-b border-neutral-100 dark:border-neutral-800">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-neutral-500">Service Price</span>
+                                        <span className="font-medium">GH₵{service.price_amount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm text-green-600 font-bold">
+                                        <span>Deposit Required (Now)</span>
+                                        <span>GH₵{depositAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm text-neutral-400">
+                                        <span>Due after service</span>
+                                        <span>GH₵{remainingAmount.toFixed(2)}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-between items-center text-lg font-bold">
+                                    <span>Total to Pay Now</span>
+                                    <span>GH₵{depositAmount.toFixed(2)}</span>
+                                </div>
+
+                                <button
+                                    onClick={handleBooking}
+                                    disabled={isBooking}
+                                    className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold tracking-wide hover:opacity-80 transition-opacity flex items-center justify-center gap-2"
+                                >
+                                    {isBooking ? (
+                                        <Loader2 className="animate-spin w-5 h-5" />
+                                    ) : (
+                                        <>PAY DEPOSIT & BOOK</>
+                                    )}
+                                </button>
+                                <p className="text-xs text-center text-neutral-400">By booking, you agree to our Terms of Service.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    );
+}

@@ -32,6 +32,7 @@ export default function ListPage() {
     // Service State
     const [serviceName, setServiceName] = useState("");
     const [price, setPrice] = useState("");
+    const [deposit, setDeposit] = useState(""); // Added
     const [description, setDescription] = useState("");
 
     // Image Upload State
@@ -62,25 +63,50 @@ export default function ListPage() {
         fetchBusinesses();
     }, [supabase]);
 
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (files && files.length > 0) {
+            setIsLoading(true); // Reuse loading state to show processing
             const newFiles = Array.from(files);
+            const processedFiles: File[] = [];
 
-            // Validate sizes
-            const validFiles = newFiles.filter(file => {
+            for (const file of newFiles) {
+                // Validate size
                 if (file.size > 10 * 1024 * 1024) {
                     showToast(`File ${file.name} is too large. Max 10MB.`, "error");
-                    return false;
+                    continue;
                 }
-                return true;
-            });
 
-            setImageFiles(prev => [...prev, ...validFiles]);
+                // Handle HEIC
+                if (file.type === "image/heic" || file.name.toLowerCase().endsWith(".heic")) {
+                    try {
+                        const heic2any = (await import("heic2any")).default;
+                        const convertedBlob = await heic2any({
+                            blob: file,
+                            toType: "image/jpeg",
+                            quality: 0.8
+                        });
 
-            // Create previews
-            const newPreviews = validFiles.map(file => URL.createObjectURL(file));
-            setImagePreviews(prev => [...prev, ...newPreviews]);
+                        const blobToUse = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                        const newFile = new File([blobToUse], file.name.replace(/\.heic$/i, ".jpg"), {
+                            type: "image/jpeg"
+                        });
+                        processedFiles.push(newFile);
+                    } catch (err) {
+                        console.error("HEIC Conversion failed", err);
+                        showToast(`Could not convert ${file.name}.`, "error");
+                    }
+                } else {
+                    processedFiles.push(file);
+                }
+            }
+
+            if (processedFiles.length > 0) {
+                setImageFiles(prev => [...prev, ...processedFiles]);
+                const newPreviews = processedFiles.map(file => URL.createObjectURL(file));
+                setImagePreviews(prev => [...prev, ...newPreviews]);
+            }
+            setIsLoading(false);
         }
     };
 
@@ -96,13 +122,26 @@ export default function ListPage() {
     const handlePublish = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (selectedBusiness === "individual" && (!email || !phone)) {
-            showToast("Please provide both email and phone number.", "error");
+        if (selectedBusiness === "individual" && (!email || !phone || !location)) {
+            showToast("Please provide email, phone, and location.", "error");
             return;
         }
 
-        if (!serviceName || !price) {
-            showToast("Please provide a service name and price.", "error");
+        if (!serviceName || !price || !description || !category) {
+            showToast("Please fill in all service details (Name, Price, Description, Category).", "error");
+            return;
+        }
+
+        const priceVal = parseFloat(price.replace(/[^0-9.]/g, ''));
+        const depositVal = deposit ? parseFloat(deposit.replace(/[^0-9.]/g, '')) : 0;
+
+        if (depositVal > priceVal) {
+            showToast("Deposit cannot be higher than the total price.", "error");
+            return;
+        }
+
+        if (imageFiles.length === 0) {
+            showToast("Please upload at least one image.", "error");
             return;
         }
 
@@ -151,6 +190,7 @@ export default function ListPage() {
                         business_id: null,
                         name: serviceName,
                         price_amount: parseFloat(price.replace(/[^0-9.]/g, '')),
+                        deposit_amount: deposit ? parseFloat(deposit.replace(/[^0-9.]/g, '')) : 0, // Added
                         description: description,
                         category: category || "Uncategorized",
                         location_text: location,
@@ -170,6 +210,7 @@ export default function ListPage() {
                         profile_id: null,
                         name: serviceName,
                         price_amount: parseFloat(price.replace(/[^0-9.]/g, '')),
+                        deposit_amount: deposit ? parseFloat(deposit.replace(/[^0-9.]/g, '')) : 0, // Added
                         description: description,
                         category: category || "Uncategorized",
                         image_url: imageUrls[0] || null,
@@ -239,11 +280,12 @@ export default function ListPage() {
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold tracking-wide ml-1">SERVICE NAME</label>
+                                    <label className="text-sm font-bold tracking-wide ml-1">SERVICE NAME <span className="text-red-500">*</span></label>
                                     <input
                                         type="text"
+                                        required
                                         value={serviceName}
                                         onChange={(e) => setServiceName(e.target.value)}
                                         placeholder="e.g. Home Cleaning Standard"
@@ -251,21 +293,34 @@ export default function ListPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold tracking-wide ml-1">PRICE (GH₵)</label>
+                                    <label className="text-sm font-bold tracking-wide ml-1">PRICE (GH₵) <span className="text-red-500">*</span></label>
                                     <input
                                         type="text"
+                                        required
                                         value={price}
                                         onChange={(e) => setPrice(e.target.value)}
                                         placeholder="0.00"
                                         className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold tracking-wide ml-1 text-neutral-500">DEPOSIT (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={deposit}
+                                        onChange={(e) => setDeposit(e.target.value)}
+                                        placeholder="0.00"
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                    />
+                                    <p className="text-xs text-neutral-400 ml-1">Client pays this to confirm.</p>
+                                </div>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-bold tracking-wide ml-1">SHORT DESCRIPTION</label>
+                                <label className="text-sm font-bold tracking-wide ml-1">SHORT DESCRIPTION <span className="text-red-500">*</span></label>
                                 <textarea
                                     rows={3}
+                                    required
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Briefly describe your service..."
@@ -275,8 +330,9 @@ export default function ListPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><Tag className="w-4 h-4" /> CATEGORY</label>
+                                    <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><Tag className="w-4 h-4" /> CATEGORY <span className="text-red-500">*</span></label>
                                     <select
+                                        required
                                         value={category}
                                         onChange={(e) => setCategory(e.target.value)}
                                         className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none appearance-none"
@@ -289,10 +345,11 @@ export default function ListPage() {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> LOCATION</label>
+                                    <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> LOCATION <span className="text-red-500">*</span></label>
                                     {selectedBusiness === "individual" ? (
                                         <div className="relative">
                                             <LocationAutocomplete
+                                                required
                                                 onSelect={(loc) => {
                                                     setLocation(loc.address);
                                                     setLat(loc.lat);
@@ -338,7 +395,7 @@ export default function ListPage() {
                             )}
 
                             <div className="pt-2">
-                                <label className="text-sm font-bold tracking-wide ml-1 mb-2 block">PHOTOS (Max 5)</label>
+                                <label className="text-sm font-bold tracking-wide ml-1 mb-2 block">PHOTOS (Max 5) <span className="text-red-500">*</span></label>
                                 <input
                                     type="file"
                                     ref={fileInputRef}
