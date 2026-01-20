@@ -3,13 +3,14 @@
 import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera } from "lucide-react";
+import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera, Bell, BarChart } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
+import NotificationsSheet from "@/components/NotificationsSheet";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
 type Service = Database['public']['Tables']['services']['Row'] & {
@@ -18,7 +19,7 @@ type Service = Database['public']['Tables']['services']['Row'] & {
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
     services: { name: string; price_amount: number; price_currency: string } | null;
     businesses: { name: string } | null;
-    profiles: { full_name: string } | null;
+    profiles: { full_name: string; avatar_url: string | null } | null;
 };
 
 export default function AccountPage() {
@@ -38,6 +39,8 @@ export default function AccountPage() {
     const [myBusinesses, setMyBusinesses] = useState<Business[]>([]);
     const [myListings, setMyListings] = useState<Service[]>([]);
     const [myBookings, setMyBookings] = useState<Booking[]>([]); // Added
+    const [notifications, setNotifications] = useState<Booking[]>([]);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -74,7 +77,7 @@ export default function AccountPage() {
                         *,
                         services (name, price_amount, price_currency),
                         businesses (name),
-                        profiles!bookings_provider_id_fkey (full_name)
+                        profiles:profiles!provider_id (full_name, avatar_url)
                     `)
                     .eq('user_id', user.id)
                     .order('booking_date', { ascending: false });
@@ -84,8 +87,63 @@ export default function AccountPage() {
             }
         };
 
+        const fetchNotifications = async () => {
+            if (!user) return;
+
+            // 1. Get my businesses
+            const { data: businesses } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
+            const businessIds = businesses?.map(b => b.id) || [];
+
+            // 2. Fetch Provider Notifications (Bookings for my services needing action)
+            // Assuming 'pending_payment' or just created bookings are "new"
+            let providerQuery = supabase
+                .from('bookings')
+                .select(`
+                    *,
+                    services (name, price_amount, price_currency),
+                    businesses (name),
+                    profiles:profiles!user_id (full_name)
+                `)
+                .neq('status', 'cancelled'); // Get active ones
+
+            if (businessIds.length > 0) {
+                providerQuery = providerQuery.or(`provider_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
+            } else {
+                providerQuery = providerQuery.eq('provider_id', user.id);
+            }
+
+            const { data: providerData } = await providerQuery;
+
+            // Filter locally for now for "Actionable" or "New"
+            // For now, let's show ALL pending/confirmed to the provider as "Inbox"
+            const providerNotifications = providerData || [];
+
+            // 3. Fetch Customer Notifications (Updates on my bookings)
+            // Mostly just show recent confirmations?
+            const { data: customerData } = await supabase
+                .from('bookings')
+                .select(`
+                    *,
+                    services (name, price_amount, price_currency),
+                    businesses (name),
+                    profiles:profiles!provider_id (full_name)
+                `)
+                .eq('user_id', user.id)
+                .eq('status', 'confirmed') // Only show confirmed updates for now
+                .order('created_at', { ascending: false, nullsFirst: false }) // valid order provided updated_at exists, schema says it does
+                .limit(5);
+
+            // Merge and deduplicate if necessary (unlikely to overlap ID unless self-booking)
+            const allNotifs = [...providerNotifications, ...(customerData || [])].filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
+
+            // Sort by date desc
+            allNotifs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setNotifications(allNotifs as any);
+        };
 
         fetchData();
+        fetchNotifications();
     }, [activeTab, user, supabase]);
 
     // Fetch User on Mount
@@ -147,6 +205,7 @@ export default function AccountPage() {
 
         // Optimistic update
         setMyBookings(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
+        setNotifications(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'cancelled' } : b));
 
         const { error } = await supabase
             .from('bookings')
@@ -156,6 +215,53 @@ export default function AccountPage() {
         if (error) {
             console.error("Error cancelling booking", error);
             // Revert optimistic update ideally, but simplified for now
+        }
+    };
+
+    const handleConfirmBooking = async (bookingId: string) => {
+        // Optimistic update
+        setNotifications(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
+
+        const { error } = await supabase
+            .from('bookings')
+            .update({ status: 'confirmed' })
+            .eq('id', bookingId);
+
+        if (error) {
+            console.error("Error confirming booking", error);
+            alert("Failed to confirm booking");
+        }
+    };
+
+    const handlePostponeBooking = async (bookingId: string) => {
+        const newDate = prompt("Enter a proposed new date/time (e.g. 'Tomorrow at 2pm'):");
+        if (!newDate) return;
+
+        // Just updating notes for now as a simple implementation of "Request Postpone"
+        let { error } = await supabase.rpc('append_booking_note', {
+            booking_id: bookingId,
+            note: `Postpone Requested: ${newDate}`
+        });
+
+        if (error) {
+            // Fallback if RPC doesn't exist or fails
+            const { data } = await supabase.from('bookings').select('notes').eq('id', bookingId).single();
+            const updateResult = await supabase.from('bookings').update({
+                notes: (data?.notes || "") + `\n[Postpone Requested: ${newDate}]`
+            }).eq('id', bookingId);
+
+            // If fallback succeeded, clear the error
+            if (!updateResult.error) {
+                error = null;
+            } else {
+                error = updateResult.error;
+            }
+        }
+
+        if (!error) {
+            alert("Postpone request added to booking notes.");
+        } else {
+            console.error("Error requesting postpone", error);
         }
     };
 
@@ -332,12 +438,23 @@ export default function AccountPage() {
                                                             <h3 className="font-heading text-2xl font-bold mb-1">Welcome Back, {profile?.full_name?.split(' ')[0] || "User"}.</h3>
                                                             <p className="text-neutral-500 text-sm">Here's a quick overview of your activity.</p>
                                                         </div>
-                                                        <button
-                                                            onClick={() => setIsEditingProfile(true)}
-                                                            className="flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-900 rounded-lg text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
-                                                        >
-                                                            <Edit2 className="w-4 h-4" /> Edit Profile
-                                                        </button>
+                                                        <div className="flex items-center gap-3">
+                                                            <button
+                                                                onClick={() => setIsNotificationsOpen(true)}
+                                                                className="relative p-2 bg-neutral-100 dark:bg-neutral-900 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                                                            >
+                                                                <Bell className="w-5 h-5" />
+                                                                {notifications.some(n => n.status !== 'confirmed' && n.status !== 'cancelled' && n.user_id !== user?.id) && (
+                                                                    <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-black"></span>
+                                                                )}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setIsEditingProfile(true)}
+                                                                className="flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-900 rounded-lg text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                                                            >
+                                                                <Edit2 className="w-4 h-4" /> Edit Profile
+                                                            </button>
+                                                        </div>
                                                     </div>
 
                                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -484,11 +601,130 @@ export default function AccountPage() {
                                                             </p>
                                                         </div>
                                                         <div className="flex gap-2">
+                                                            <Link href={`/account/listings/${service.id}/analytics`}>
+                                                                <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20" title="Analytics">
+                                                                    <BarChart className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
+                                                                </button>
+                                                            </Link>
                                                             <Link href={`/service/edit/${service.id}`}>
-                                                                <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20">
+                                                                <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20" title="Edit">
                                                                     <Edit3 className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
                                                                 </button>
                                                             </Link>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {activeTab === "bookings" && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="font-heading text-2xl font-bold">My Bookings</h3>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {myBookings.length === 0 ? (
+                                                <div className="text-center py-12 text-neutral-500">
+                                                    <p>You haven't made any bookings yet.</p>
+                                                    <Link href="/">
+                                                        <button className="mt-4 px-6 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm">Browse Services</button>
+                                                    </Link>
+                                                </div>
+                                            ) : (
+                                                myBookings.map((booking) => (
+                                                    <div key={booking.id} className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 hover:shadow-sm transition-shadow">
+                                                        {/* Header: Date & Status */}
+                                                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-neutral-100 dark:border-neutral-900 leading-none">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                                                    booking.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                                        'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                                                    }`}>
+                                                                    {booking.status}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Main Content */}
+                                                        <div className="flex items-start gap-4">
+                                                            {/* Provider Avatar */}
+                                                            <div className="flex-shrink-0">
+                                                                <div className="w-14 h-14 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 shadow-sm relative">
+                                                                    {booking.profiles?.avatar_url ? (
+                                                                        <Image
+                                                                            src={booking.profiles.avatar_url}
+                                                                            alt={booking.profiles.full_name || "Provider"}
+                                                                            fill
+                                                                            className="object-cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="w-full h-full flex items-center justify-center text-lg font-bold text-neutral-400">
+                                                                            {(booking.businesses?.name?.[0] || booking.profiles?.full_name?.[0] || "P").toUpperCase()}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Info */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-heading font-bold text-lg leading-tight mb-1 truncate">
+                                                                    {booking.services?.name}
+                                                                </h4>
+                                                                <p className="text-sm text-neutral-500 truncate mb-3">
+                                                                    Provided by <span className="font-bold text-foreground">{booking.businesses?.name || booking.profiles?.full_name}</span>
+                                                                </p>
+
+                                                                {/* Prominent Date & Time */}
+                                                                <div className="flex flex-wrap items-center gap-3 mb-3">
+                                                                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-900 px-3 py-1.5 rounded-lg">
+                                                                        <Calendar className="w-4 h-4 text-neutral-500" />
+                                                                        <span className="font-bold text-sm text-foreground">
+                                                                            {new Date(booking.booking_date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2 bg-neutral-100 dark:bg-neutral-900 px-3 py-1.5 rounded-lg">
+                                                                        <Clock className="w-4 h-4 text-neutral-500" />
+                                                                        <span className="font-bold text-sm text-foreground">
+                                                                            {new Date(booking.booking_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-baseline gap-1">
+                                                                    <span className="text-lg font-bold text-black dark:text-white">
+                                                                        {booking.services?.price_currency} {booking.services?.price_amount}
+                                                                    </span>
+                                                                    {booking.amount_paid && booking.amount_paid > 0 && (
+                                                                        <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">
+                                                                            Paid {booking.services?.price_currency} {booking.amount_paid}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Actions */}
+                                                        <div className="mt-5 grid grid-cols-2 gap-3">
+                                                            {booking.status !== 'cancelled' && booking.status !== 'completed' ? (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleCancelBooking(booking.id)}
+                                                                        className="px-4 py-2.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-900/30 transition-all"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                    <button className="px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">
+                                                                        View Details
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <button className="col-span-2 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors">
+                                                                    View Details
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))
@@ -502,6 +738,15 @@ export default function AccountPage() {
                     </motion.div>
                 </AnimatePresence>
             </div>
+
+            <NotificationsSheet
+                isOpen={isNotificationsOpen}
+                onClose={() => setIsNotificationsOpen(false)}
+                notifications={notifications}
+                onConfirm={handleConfirmBooking}
+                onPostpone={handlePostponeBooking}
+                currentUserId={user?.id}
+            />
         </main>
     );
 }
