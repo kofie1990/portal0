@@ -64,9 +64,12 @@ export default function Home() {
           businessType: b.location_type === 'physical' ? 'store' : 'service',
           bio: b.bio,
           services: b.services?.map((s: any) => ({
+            id: s.id,
             name: s.name,
             price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
-            duration: s.duration_text
+            duration: s.duration_text,
+            image: s.image_url || (s.images && s.images[0]) || null,
+            description: s.description
           }))
         }));
       }
@@ -74,37 +77,54 @@ export default function Home() {
       // 2. Fetch Individual Profiles (that have services or are marked as providers)
       const { data: pData, error: pError } = await supabase
         .from('profiles')
-        .select('*, services(*)')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null);
+        .select('*, services(*)');
 
       let mappedProfiles: any[] = [];
       if (pData && !pError) {
-        mappedProfiles = pData.map((p: any) => ({
-          id: p.id,
-          name: p.full_name || "Unnamed User",
-          lat: p.lat,
-          lng: p.lng,
-          image: "bg-blue-100",
-          imageUrl: p.avatar_url,
-          category: "Individual", // Default, but can be overridden by search
-          rating: 0,
-          address: p.location_text,
-          type: 'profile',
-          bio: p.bio,
-          services: p.services?.map((s: any) => ({
-            name: s.name,
-            price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
-            description: s.description,
-            category: s.category
-          })) || []
-        }));
+        mappedProfiles = pData.map((p: any) => {
+          // Determine Location: Profile > First Service > Null
+          let finalLat = p.lat;
+          let finalLng = p.lng;
+          let finalAddress = p.location_text;
+
+          // If no profile location, try to find a service with a location
+          if ((!finalLat || !finalLng) && p.services && p.services.length > 0) {
+            const serviceWithLoc = p.services.find((s: any) => s.lat && s.lng);
+            if (serviceWithLoc) {
+              finalLat = serviceWithLoc.lat;
+              finalLng = serviceWithLoc.lng;
+              finalAddress = serviceWithLoc.location_text || finalAddress;
+            }
+          }
+
+          // If still no location, exclude from map
+          if (!finalLat || !finalLng) return null;
+
+          return {
+            id: p.id,
+            name: p.full_name || "Unnamed User",
+            lat: finalLat,
+            lng: finalLng,
+            image: "bg-blue-100",
+            imageUrl: p.avatar_url,
+            category: "Individual", // Default, but can be overridden by search
+            rating: 0,
+            address: finalAddress,
+            type: 'profile',
+            bio: p.bio,
+            services: p.services?.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
+              description: s.description,
+              category: s.category,
+              image: s.image_url || (s.images && s.images[0]) || null
+            })) || []
+          };
+        }).filter((p) => p !== null);
       }
 
-      // 3. Fetch Individual Services - REMOVED as per user request to only show businesses and profiles on map.
-      // const { data: sData, error: sError } = await supabase...
-
-      setBusinesses([...mappedBusinesses, ...mappedProfiles]); // Removed mappedServices
+      setBusinesses([...mappedBusinesses, ...mappedProfiles]);
     };
     fetchToMap();
   }, []);
