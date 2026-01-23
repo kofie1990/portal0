@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import NotificationsSheet from "@/components/NotificationsSheet";
+import CalendarView from "@/components/CalendarView";
 import { confirmBooking } from "@/app/actions/booking";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
@@ -40,6 +41,7 @@ export default function AccountPage() {
     const [myBusinesses, setMyBusinesses] = useState<Business[]>([]);
     const [myListings, setMyListings] = useState<Service[]>([]);
     const [myBookings, setMyBookings] = useState<Booking[]>([]); // Added
+    const [providerBookings, setProviderBookings] = useState<Booking[]>([]); // Added for calendar
     const [notifications, setNotifications] = useState<Booking[]>([]);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -85,6 +87,46 @@ export default function AccountPage() {
 
                 if (error) console.error("Error fetching bookings:", error);
                 if (bookingsData) setMyBookings(bookingsData as any);
+            }
+
+            if (activeTab === 'calendar') {
+                // Fetch My Bookings (As Customer)
+                const { data: myBookingsData } = await supabase
+                    .from('bookings')
+                    .select(`
+                        *,
+                        services (name, price_amount, price_currency),
+                        businesses (name),
+                        profiles:profiles!provider_id (full_name, avatar_url)
+                    `)
+                    .eq('user_id', user.id)
+                    .neq('status', 'cancelled');
+
+                // Fetch Provider Bookings (As Service Provider)
+                // 1. Get my businesses IDs first
+                const { data: bizData } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
+                const businessIds = bizData?.map(b => b.id) || [];
+
+                let providerQuery = supabase
+                    .from('bookings')
+                    .select(`
+                        *,
+                        services (name, price_amount, price_currency),
+                        businesses (name),
+                        profiles:profiles!user_id (full_name, avatar_url)
+                    `)
+                    .neq('status', 'cancelled');
+
+                if (businessIds.length > 0) {
+                    providerQuery = providerQuery.or(`provider_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
+                } else {
+                    providerQuery = providerQuery.eq('provider_id', user.id);
+                }
+
+                const { data: providerBookingsData } = await providerQuery;
+
+                if (myBookingsData) setMyBookings(myBookingsData as any);
+                if (providerBookingsData) setProviderBookings(providerBookingsData as any);
             }
         };
 
@@ -332,7 +374,13 @@ export default function AccountPage() {
                                         onClick={() => setActiveTab("bookings")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "bookings" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
-                                        <Calendar className="w-4 h-4" /> My Bookings
+                                        <List className="w-4 h-4" /> My Bookings
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab("calendar")}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "calendar" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
+                                    >
+                                        <Calendar className="w-4 h-4" /> Calendar
                                     </button>
                                     <div className="h-px bg-neutral-200 dark:bg-neutral-800 my-4" />
                                     <button
@@ -729,6 +777,18 @@ export default function AccountPage() {
                                                 ))
                                             )}
                                         </div>
+                                    </motion.div>
+                                )}
+
+                                {activeTab === "calendar" && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="font-heading text-2xl font-bold">Calendar</h3>
+                                        </div>
+                                        <CalendarView
+                                            bookings={[...myBookings, ...providerBookings]}
+                                            currentUserId={user?.id}
+                                        />
                                     </motion.div>
                                 )}
 
