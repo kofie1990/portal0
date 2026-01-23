@@ -91,7 +91,7 @@ function LoginContent() {
                         </button>
 
                         <div className="text-center pt-2">
-                            <Link href="#" className="text-xs font-bold text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
+                            <Link href="/login/forgot-password" className="text-xs font-bold text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
                                 FORGOT PASSWORD?
                             </Link>
                         </div>

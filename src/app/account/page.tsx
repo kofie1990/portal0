@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import NotificationsSheet from "@/components/NotificationsSheet";
+import { confirmBooking } from "@/app/actions/booking";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
 type Service = Database['public']['Tables']['services']['Row'] & {
@@ -222,14 +223,12 @@ export default function AccountPage() {
         // Optimistic update
         setNotifications(prev => prev.map(b => b.id === bookingId ? { ...b, status: 'confirmed' } : b));
 
-        const { error } = await supabase
-            .from('bookings')
-            .update({ status: 'confirmed' })
-            .eq('id', bookingId);
+        const result = await confirmBooking(bookingId);
 
-        if (error) {
-            console.error("Error confirming booking", error);
-            alert("Failed to confirm booking");
+        if (result.error) {
+            console.error("Error confirming booking", result.error);
+            alert("Failed to confirm booking: " + result.error);
+            // Revert optimistic update?
         }
     };
 

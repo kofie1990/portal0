@@ -58,28 +58,68 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
             const deposit = service.deposit_amount || 0;
             const total = service.price_amount;
 
-            // Create Booking
-            const { error } = await supabase.from('bookings').insert({
-                user_id: user.id,
-                service_id: service.id,
-                business_id: service.business_id,
-                provider_id: service.profile_id,
-                booking_date: new Date(bookingDate).toISOString(),
-                status: 'confirmed', // Auto-confirm for now as "payment" is mocked
-                total_amount: total,
-                amount_paid: deposit,
-                notes: "Booking via Portal"
+            // 1. Create Booking (Pending Payment)
+            const { data: bookingData, error: bookingError } = await supabase
+                .from('bookings')
+                .insert({
+                    user_id: user.id,
+                    service_id: service.id,
+                    business_id: service.business_id,
+                    provider_id: service.profile_id,
+                    booking_date: new Date(bookingDate).toISOString(),
+                    status: 'pending_payment',
+                    total_amount: total,
+                    amount_paid: 0,
+                    notes: "Booking initialized",
+                })
+                .select()
+                .single();
+
+            if (bookingError) throw bookingError;
+
+            // 2. Initialize Paystack
+            const res = await fetch('/api/paystack/initialize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: user.email,
+                    amount: deposit, // Paystack expects amount in main currency if logic in API handles *100. 
+                    // Checking api/paystack/initialize logic:
+                    // "amount: amount * 100" -> So we send amount in GHS, api converts to pesewas. Correct.
+                    metadata: {
+                        booking_id: bookingData.id,
+                        vendorId: service.business_id || service.profile_id, // For split payments if needed
+                        custom_fields: [
+                            {
+                                display_name: "Service",
+                                variable_name: "service",
+                                value: service.name
+                            }
+                        ]
+                    }
+                })
             });
 
-            if (error) throw error;
+            const paystackData = await res.json();
 
-            showToast("Booking Confirmed!", "success");
-            router.push("/account"); // Redirect to account/bookings page later
+            if (!res.ok) {
+                throw new Error(paystackData.error || "Payment initialization failed");
+            }
+
+            // 3. Redirect to Paystack
+            if (paystackData.authorization_url) {
+                router.push(paystackData.authorization_url);
+            } else {
+                throw new Error("No payment URL received");
+            }
+
         } catch (error: any) {
             console.error(error);
             showToast(error.message || "Booking failed", "error");
-        } finally {
-            setIsBooking(false);
+            setIsBooking(false); // Only reset if error. If redirecting, keep loading? 
+            // Better to keep loading so user doesn't click again while redirect happens.
+            // But if router.push takes time, maybe unsafe.
+            // Let's reset isBooking if error.
         }
     };
 

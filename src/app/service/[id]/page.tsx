@@ -2,7 +2,7 @@
 
 import Navigation from "@/components/Navigation";
 import { use } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Star, MapPin, Clock, ArrowLeft, CheckCircle, Share2, Heart, Calendar } from "lucide-react";
@@ -65,6 +65,7 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const hasLoggedView = useRef(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -82,6 +83,27 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
 
                 if (serviceError) throw serviceError;
                 setService(serviceData as any);
+
+                // Track View (Optimized: Deduplicate & Throttle)
+                const lastViewKey = `view_timestamp_${id}`;
+                const lastViewTime = localStorage.getItem(lastViewKey);
+                const now = Date.now();
+                const oneHour = 60 * 60 * 1000;
+
+                // Only track if:
+                // 1. Not already logged in this session component instance (Strict Mode fix)
+                // 2. No view recorded for this service in the last hour (Spam prevention)
+                if (!hasLoggedView.current && (!lastViewTime || now - parseInt(lastViewTime) > oneHour)) {
+                    hasLoggedView.current = true;
+                    // Update storage immediately to prevent race conditions
+                    localStorage.setItem(lastViewKey, now.toString());
+
+                    const { data: { user } } = await supabase.auth.getUser();
+                    await supabase.from('service_views').insert({
+                        service_id: id,
+                        viewer_id: user?.id || null
+                    });
+                }
 
                 // Fetch Reviews
                 const { data: reviewsData, error: reviewsError } = await supabase

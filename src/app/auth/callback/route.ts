@@ -17,7 +17,7 @@ export async function GET(request: Request) {
             const { data: { user } } = await supabase.auth.getUser();
             let redirectPath = next;
 
-            if (user) {
+            if (user && next !== '/account/update-password') {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('role, onboarding_completed')

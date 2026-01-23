@@ -41,6 +41,7 @@ export default function ListingAnalyticsPage() {
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalBookings, setTotalBookings] = useState(0);
     const [pendingBookings, setPendingBookings] = useState(0);
+    const [totalViews, setTotalViews] = useState(0);
     const [averageRating, setAverageRating] = useState(0); // Placeholder for now
 
     // Chart Data
@@ -102,10 +103,23 @@ export default function ListingAnalyticsPage() {
                     chartMap.set(date, current + (booking.total_amount || 0));
                 });
 
-                const chartArray = Array.from(chartMap.entries()).map(([date, amount]) => ({
-                    date,
-                    revenue: amount
-                }));
+                const chartArray = Array.from(chartMap.entries())
+                    .map(([date, amount]) => ({
+                        date,
+                        revenue: amount,
+                        timestamp: new Date(date).getTime()
+                    }))
+                    .sort((a, b) => a.timestamp - b.timestamp);
+
+                // Track View logic added in service page.
+
+                // 3. Fetch View Count
+                const { count: viewCount, error: viewError } = await supabase
+                    .from('service_views')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('service_id', serviceId);
+
+                setTotalViews(viewCount || 0);
 
                 // Ensure we have at least some data points or empty state
                 setRevenueData(chartArray);
@@ -198,12 +212,12 @@ export default function ListingAnalyticsPage() {
                             {pendingBookings}
                         </div>
                         <p className="text-xs text-neutral-500 mt-1">
-                            Requires action
+                            Awaiting action
                         </p>
                     </div>
 
-                    {/* Placeholder for Views since we don't track it yet */}
-                    <div className="bg-white dark:bg-black p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 opacity-60">
+                    {/* Views Card */}
+                    <div className="bg-white dark:bg-black p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-bold text-neutral-500 uppercase tracking-wider">Views</span>
                             <div className="p-2 bg-purple-100 dark:bg-purple-900/20 text-purple-600 rounded-lg">
@@ -211,10 +225,10 @@ export default function ListingAnalyticsPage() {
                             </div>
                         </div>
                         <div className="text-3xl font-heading font-bold">
-                            0
+                            {totalViews}
                         </div>
                         <p className="text-xs text-neutral-500 mt-1">
-                            Coming soon
+                            Total views
                         </p>
                     </div>
                 </div>
@@ -223,47 +237,55 @@ export default function ListingAnalyticsPage() {
                     {/* Chart Section */}
                     <div className="lg:col-span-2 bg-white dark:bg-black p-8 rounded-2xl border border-neutral-200 dark:border-neutral-800">
                         <h3 className="font-heading text-xl font-bold mb-6">Revenue Over Time</h3>
-                        <div className="h-80 w-full">
+                        <div className="w-full h-80 min-w-0">
                             {revenueData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={revenueData}>
                                         <defs>
                                             <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#000000" stopOpacity={0.1} />
-                                                <stop offset="95%" stopColor="#000000" stopOpacity={0} />
+                                                <stop offset="5%" stopColor="var(--foreground)" stopOpacity={0.1} />
+                                                <stop offset="95%" stopColor="var(--foreground)" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--muted)" />
                                         <XAxis
                                             dataKey="date"
                                             axisLine={false}
                                             tickLine={false}
-                                            tick={{ fill: '#737373', fontSize: 12 }}
+                                            tick={{ fill: 'var(--foreground)', fontSize: 12, opacity: 0.5 }}
                                             dy={10}
                                         />
                                         <YAxis
                                             axisLine={false}
                                             tickLine={false}
-                                            tick={{ fill: '#737373', fontSize: 12 }}
+                                            tick={{ fill: 'var(--foreground)', fontSize: 12, opacity: 0.5 }}
                                             tickFormatter={(value) => `${service.price_currency}${value}`}
                                         />
                                         <Tooltip
-                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                            contentStyle={{
+                                                borderRadius: '12px',
+                                                border: '1px solid var(--muted)',
+                                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                                backgroundColor: 'var(--background)',
+                                                color: 'var(--foreground)'
+                                            }}
+                                            cursor={{ stroke: 'var(--foreground)', strokeWidth: 1, strokeDasharray: '4 4', opacity: 0.5 }}
                                         />
                                         <Area
                                             type="monotone"
                                             dataKey="revenue"
-                                            stroke="#000000"
+                                            stroke="var(--foreground)"
                                             fillOpacity={1}
                                             fill="url(#colorRevenue)"
-                                            strokeWidth={3}
-                                            activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2 }}
+                                            strokeWidth={2}
+                                            activeDot={{ r: 6, stroke: 'var(--background)', strokeWidth: 2, fill: 'var(--foreground)' }}
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             ) : (
-                                <div className="h-full flex items-center justify-center text-neutral-400">
-                                    No sufficient data to display chart.
+                                <div className="h-full flex flex-col items-center justify-center text-neutral-400 bg-neutral-50 dark:bg-neutral-900/30 rounded-xl">
+                                    <p className="font-bold mb-1">No revenue data available</p>
+                                    <p className="text-xs">Only confirmed bookings appear here.</p>
                                 </div>
                             )}
                         </div>
@@ -296,7 +318,7 @@ export default function ListingAnalyticsPage() {
                                             {service.price_currency}{booking.total_amount}
                                         </span>
                                         <span className={`text-[10px] uppercase font-bold ${booking.status === 'confirmed' ? 'text-green-600' :
-                                                booking.status === 'cancelled' ? 'text-red-500' : 'text-amber-500'
+                                            booking.status === 'cancelled' ? 'text-red-500' : 'text-amber-500'
                                             }`}>
                                             {booking.status}
                                         </span>
