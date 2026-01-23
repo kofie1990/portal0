@@ -151,7 +151,27 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                         </div>
                         <div className="md:col-span-2 h-[400px] rounded-2xl overflow-hidden shadow-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-100">
                             <InteractiveMap
-                                items={[vendor]}
+                                items={[{
+                                    id: vendor.id,
+                                    lat: vendor.lat,
+                                    lng: vendor.lng,
+                                    name: vendor.name,
+                                    image: vendor.image,
+                                    imageUrl: vendor.imageUrl,
+                                    category: vendor.category,
+                                    rating: vendor.rating,
+                                    address: vendor.address,
+                                    phone: vendor.phone,
+                                    type: vendor.type === 'business' ? 'business' : 'individual',
+                                    businessType: vendor.businessType,
+                                    services: vendor.services?.map((s, idx) => ({
+                                        id: `mock-svc-${idx}`,
+                                        name: s.name,
+                                        price: s.price,
+                                        description: s.duration,
+                                        image: null
+                                    }))
+                                }]}
                                 center={{ lat: vendor.lat, lng: vendor.lng }}
                                 zoom={15}
                             />

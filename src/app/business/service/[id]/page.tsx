@@ -50,9 +50,12 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                     openNow: b.open_now,
 
                     services: b.services?.map((s: any) => ({
+                        id: s.id,
                         name: s.name,
                         price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
-                        duration: s.duration_text
+                        duration: s.duration_text,
+                        image: s.image_url,
+                        description: s.description
                     })) || []
                 });
             } else {
