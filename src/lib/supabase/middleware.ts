@@ -20,6 +20,8 @@ export async function updateSession(request: NextRequest) {
                             name,
                             value,
                             ...options,
+                            sameSite: 'lax',
+                            secure: process.env.NODE_ENV === 'production',
                         })
                     )
                     supabaseResponse = NextResponse.next({
@@ -30,6 +32,8 @@ export async function updateSession(request: NextRequest) {
                             name,
                             value,
                             ...options,
+                            sameSite: 'lax',
+                            secure: process.env.NODE_ENV === 'production',
                         })
                     )
                 },
