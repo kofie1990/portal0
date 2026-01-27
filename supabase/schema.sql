@@ -100,6 +100,8 @@ create table services (
   category text,
   image_url text,
   location_text text, -- For individual services that have a specific location
+  lat double precision,
+  lng double precision,
 
   constraint services_owner_check check (
     (business_id is not null and profile_id is null) or 

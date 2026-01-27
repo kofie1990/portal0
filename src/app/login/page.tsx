@@ -25,7 +25,7 @@ function LoginContent() {
         setError(null);
 
         const supabase = createClient();
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
@@ -34,6 +34,21 @@ function LoginContent() {
             setError(error.message);
             setIsLoading(false);
         } else {
+            // Check onboarding status
+            if (data.user) {
+                const { data: profile } = await supabase
+                    .from("profiles")
+                    .select("onboarding_completed")
+                    .eq("id", data.user.id)
+                    .single();
+
+                if (profile && !profile.onboarding_completed) {
+                    router.refresh();
+                    router.push("/onboarding");
+                    return;
+                }
+            }
+
             // Refresh router to update server components
             router.refresh();
             router.push(redirectPath);

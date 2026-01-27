@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import Navigation from "@/components/Navigation";
 import Link from "next/link";
-import { ArrowLeft, User, MapPin, ShoppingBag } from "lucide-react";
+import { ArrowLeft, User, MapPin, ShoppingBag, Star } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -12,6 +12,7 @@ export default function ProfilePage() {
     const supabase = createClient();
     const [profile, setProfile] = useState<any | null>(null);
     const [services, setServices] = useState<any[]>([]);
+    const [reviews, setReviews] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -32,8 +33,17 @@ export default function ProfilePage() {
                     .select('*')
                     .eq('profile_id', params.id);
 
+                // Fetch Reviews
+                const { data: reviewsData } = await supabase
+                    .from('reviews')
+                    .select('*, profiles:user_id(full_name, avatar_url)')
+                    .eq('reviewed_profile_id', params.id)
+                    .limit(10);
+
                 setProfile(profileData);
                 if (servicesData) setServices(servicesData);
+                if (reviewsData) setReviews(reviewsData);
+
             } catch (error) {
                 console.error("Error fetching profile:", error);
             } finally {
@@ -97,34 +107,73 @@ export default function ProfilePage() {
                                 Contact User
                             </a>
                         )}
-                        {/* Optional history button or message */}
                     </div>
-                    <div className="w-full text-left">
-                        <h3 className="font-heading text-xl font-bold mb-4 border-b pb-2 border-neutral-200">User Listings</h3>
-                        <div className="space-y-3">
-                            {services.length > 0 ? services.map((item, idx) => (
-                                <Link key={item.id} href={`/service/${item.id}`} className="block">
-                                    <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-sm hover:shadow-md transition-shadow">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                                {item.image_url ? (
-                                                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <ShoppingBag className="w-5 h-5 text-neutral-400" />
-                                                )}
+
+                    <div className="w-full text-left space-y-12">
+                        {/* Listings */}
+                        <div>
+                            <h3 className="font-heading text-xl font-bold mb-4 border-b pb-2 border-neutral-200">User Listings</h3>
+                            <div className="space-y-3">
+                                {services.length > 0 ? services.map((item, idx) => (
+                                    <Link key={item.id} href={`/service/${item.id}`} className="block">
+                                        <div className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
+                                                    {item.image_url ? (
+                                                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <ShoppingBag className="w-5 h-5 text-neutral-400" />
+                                                    )}
+                                                </div>
+                                                <div className="text-left">
+                                                    <h4 className="font-bold text-sm">{item.name}</h4>
+                                                    <p className="text-xs text-neutral-400">{item.price_currency} {item.price_amount}</p>
+                                                </div>
                                             </div>
-                                            <div className="text-left">
-                                                <h4 className="font-bold text-sm">{item.name}</h4>
-                                                <p className="text-xs text-neutral-400">{item.price_currency} {item.price_amount}</p>
-                                            </div>
+                                            <button className="text-xs font-bold text-neutral-900 dark:text-neutral-100 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700">
+                                                View
+                                            </button>
                                         </div>
-                                        <button className="text-xs font-bold text-neutral-900 dark:text-neutral-100 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-700">
-                                            View
-                                        </button>
-                                    </div>
-                                </Link>
-                            )) : (
-                                <p className="text-neutral-500 text-sm">No active listings.</p>
+                                    </Link>
+                                )) : (
+                                    <p className="text-neutral-500 text-sm">No active listings.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Reviews */}
+                        <div>
+                            <h3 className="font-heading text-xl font-bold mb-4 border-b pb-2 border-neutral-200">Reviews</h3>
+                            {reviews.length > 0 ? (
+                                <div className="space-y-4">
+                                    {reviews.map((review) => (
+                                        <div key={review.id} className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-full bg-neutral-200 overflow-hidden">
+                                                        {review.profiles?.avatar_url ? (
+                                                            <img src={review.profiles.avatar_url} alt="Reviewer" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-[10px] font-bold">{review.profiles?.full_name?.[0] || "?"}</div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold">{review.profiles?.full_name || "Anonymous"}</p>
+                                                        <p className="text-[10px] text-neutral-400">{new Date(review.created_at).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-0.5">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <Star key={i} className={`w-3 h-3 ${i < (review.rating || 0) ? "fill-black dark:fill-white text-black dark:text-white" : "text-neutral-300"}`} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <p className="text-sm text-neutral-600 dark:text-neutral-400">"{review.comment}"</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-neutral-500 text-sm">No reviews yet.</p>
                             )}
                         </div>
                     </div>

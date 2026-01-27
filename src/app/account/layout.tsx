@@ -1,8 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import OnboardingFlow from "./OnboardingFlow";
+import { ReactNode } from "react";
 
-export default async function OnboardingPage() {
+export default async function AccountLayout({
+    children,
+}: {
+    children: ReactNode;
+}) {
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -17,9 +21,9 @@ export default async function OnboardingPage() {
         .eq("id", user.id)
         .single();
 
-    if (profile && profile.onboarding_completed) {
-        redirect("/account");
+    if (profile && !profile.onboarding_completed) {
+        redirect("/onboarding");
     }
 
-    return <OnboardingFlow />;
+    return <>{children}</>;
 }

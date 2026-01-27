@@ -763,14 +763,18 @@ export default function AccountPage() {
                                                                     >
                                                                         Cancel
                                                                     </button>
-                                                                    <button className="px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">
-                                                                        View Details
-                                                                    </button>
+                                                                    <Link href={`/account/bookings/${booking.id}`}>
+                                                                        <button className="px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">
+                                                                            View Details
+                                                                        </button>
+                                                                    </Link>
                                                                 </>
                                                             ) : (
-                                                                <button className="col-span-2 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors">
-                                                                    View Details
-                                                                </button>
+                                                                <Link href={`/account/bookings/${booking.id}`} className="col-span-2">
+                                                                    <button className="w-full px-4 py-2.5 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors">
+                                                                        View Details
+                                                                    </button>
+                                                                </Link>
                                                             )}
                                                         </div>
                                                     </div>

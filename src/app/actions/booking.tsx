@@ -85,3 +85,74 @@ export async function confirmBooking(bookingId: string) {
 
     return { success: true };
 }
+
+export async function completeBooking(bookingId: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return { error: 'Unauthorized' };
+
+    // 1. Fetch Booking and verify ownership
+    // Completion is usually confirmed by the USER (Customer) to say "Yes, work done" 
+    // OR by Provider.
+    // The prompt says: "button to confirm completion of service and ability give review"
+    // Usually, User confirms completion so they can review. 
+    // Let's allow User to mark as completed.
+
+    const { data: booking, error } = await supabase.from('bookings').select('user_id').eq('id', bookingId).single();
+
+    if (error || !booking) return { error: 'Booking not found' };
+
+    if (booking.user_id !== user.id) {
+        return { error: 'Only the customer can mark this booking as completed.' };
+    }
+
+    const { error: updateError } = await supabase
+        .from('bookings')
+        .update({ status: 'completed' })
+        .eq('id', bookingId);
+
+    if (updateError) return { error: 'Failed to complete booking' };
+
+    return { success: true };
+}
+
+export async function submitReview(bookingId: string, rating: number, comment: string) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return { error: 'Unauthorized' };
+
+    // 1. Validate Booking
+    const { data: booking, error: fetchError } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('id', bookingId)
+        .single();
+
+    if (fetchError || !booking) return { error: 'Booking not found' };
+
+    if (booking.user_id !== user.id) {
+        return { error: 'You can only review your own bookings.' };
+    }
+
+    if (booking.status !== 'completed') {
+        return { error: 'You can only review completed bookings.' };
+    }
+
+    // 2. Insert Review
+    const { error: insertError } = await supabase.from('reviews').insert({
+        user_id: user.id,
+        business_id: booking.business_id,
+        reviewed_profile_id: booking.provider_id, // If it was a generic booking, this might be null? Schema check: target check ensures one is set.
+        rating,
+        comment
+    });
+
+    if (insertError) {
+        console.error(insertError);
+        return { error: 'Failed to submit review' };
+    }
+
+    return { success: true };
+}

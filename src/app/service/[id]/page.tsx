@@ -123,7 +123,7 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                 // We should fetch reviews where business_id = service.business_id OR reviewed_profile_id = service.profile_id
 
                 if (serviceData) {
-                    let reviewQuery = supabase.from('reviews').select(`*, profiles(full_name, avatar_url)`);
+                    let reviewQuery = supabase.from('reviews').select(`*, profiles:profiles!user_id(full_name, avatar_url)`);
 
                     if (serviceData.business_id) {
                         reviewQuery = reviewQuery.eq('business_id', serviceData.business_id);
@@ -240,7 +240,7 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                                             <div className="flex items-center gap-2">
                                                 <Star className="w-4 h-4 fill-black dark:fill-white text-black dark:text-white" />
                                                 <span className="text-black dark:text-white font-bold">{providerRating}</span>
-                                                <span>({reviews.length} reviews)</span>
+                                                <span>({reviews.length})</span>
                                             </div>
                                         </div>
                                     </div>
