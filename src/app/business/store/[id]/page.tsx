@@ -7,9 +7,9 @@ import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import MapPlaceholder from "@/components/MapPlaceholder";
-import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { notFound } from "next/navigation";
-import { use } from "react";
+import { use, useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
@@ -19,17 +19,67 @@ const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
 export default function StorePage({ params }: { params: Promise<{ id: string }> }) {
     // Unwrap params Promise (Next.js 16+)
     const { id } = use(params);
+    const [vendor, setVendor] = useState<any>(null);
+    const [products, setProducts] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Find vendor from mock data
-    const vendor = MOCK_BUSINESSES.find((v) => v.id === id);
+    useEffect(() => {
+        const fetchVendor = async () => {
+            const supabase = createClient();
+            const { data: b, error } = await supabase
+                .from('businesses')
+                .select('*, services(*)')
+                .eq('id', id)
+                .single();
 
-    // If not found or not a product business, show 404
-    if (!vendor || vendor.type !== 'business' || vendor.businessType !== 'store') {
+            if (b && !error) {
+                // Map DB to UI
+                setVendor({
+                    id: b.id,
+                    name: b.name,
+                    category: b.category,
+                    location: b.location_address,
+                    address: b.location_address,
+                    rating: b.rating || 0,
+                    reviews: b.review_count || 0,
+                    imageUrl: b.image_url,
+                    coverImage: b.cover_image_url,
+                    lat: b.lat,
+                    lng: b.lng,
+                    bio: b.bio || "Welcome to our flagship store.",
+                    openNow: b.open_now,
+                    type: 'business',
+                    businessType: 'store'
+                });
+
+                // Treat services as products for the store view
+                const mappedProducts = b.services?.map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
+                    imageUrl: s.image_url,
+                    description: s.description
+                })) || [];
+                setProducts(mappedProducts);
+            } else {
+                setVendor(null);
+            }
+            setIsLoading(false);
+        };
+
+        if (id) fetchVendor();
+    }, [id]);
+
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    }
+
+    // If not found, show 404
+    if (!vendor) {
         notFound();
     }
 
-    // Get products from vendor
-    const products = vendor.products || [];
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
             <Navigation />
@@ -38,7 +88,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
             {vendor.coverImage && (
                 <div className="w-full h-[60vh] relative">
                     <div className="absolute inset-0 bg-neutral-900/20 z-10" />
-                    {vendor.coverImage.startsWith("/") ? (
+                    {vendor.coverImage.startsWith("/") || vendor.coverImage.startsWith("http") ? (
                         <Image
                             src={vendor.coverImage}
                             alt="Storefront"
@@ -93,7 +143,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
 
                     {/* Featured Collection Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
-                        {products.map((product, index) => (
+                        {products.length > 0 ? products.map((product, index) => (
                             <motion.div
                                 key={product.id}
                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -102,15 +152,19 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                 viewport={{ once: true }}
                                 className="group cursor-pointer"
                             >
-                                <div className={`aspect-[3/4] ${product.image} rounded-xl mb-4 relative overflow-hidden`}>
+                                <div className={`aspect-[3/4] bg-neutral-100 dark:bg-neutral-900 rounded-xl mb-4 relative overflow-hidden`}>
                                     {/* Placeholder for Product Image */}
-                                    {product.imageUrl && (
+                                    {product.imageUrl ? (
                                         <Image
                                             src={product.imageUrl}
                                             alt={product.name}
                                             fill
                                             className="object-cover"
                                         />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-neutral-300">
+                                            <ShoppingBag className="w-12 h-12" />
+                                        </div>
                                     )}
                                     <div className="absolute inset-0 flex items-center justify-center text-neutral-400 font-heading text-2xl font-bold opacity-30 group-hover:scale-105 transition-transform duration-700 z-10">
                                         {product.name}
@@ -125,7 +179,11 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                     <span className="font-medium text-neutral-500">{product.price}</span>
                                 </div>
                             </motion.div>
-                        ))}
+                        )) : (
+                            <div className="col-span-full py-12 text-center text-neutral-500 italic">
+                                No products listed yet.
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -156,23 +214,16 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                     lat: vendor.lat,
                                     lng: vendor.lng,
                                     name: vendor.name,
-                                    image: vendor.image,
                                     imageUrl: vendor.imageUrl,
                                     category: vendor.category,
                                     rating: vendor.rating,
                                     address: vendor.address,
-                                    phone: vendor.phone,
-                                    type: vendor.type === 'business' ? 'business' : 'individual',
-                                    businessType: vendor.businessType,
-                                    services: vendor.services?.map((s, idx) => ({
-                                        id: `mock-svc-${idx}`,
-                                        name: s.name,
-                                        price: s.price,
-                                        description: s.duration,
-                                        image: null
-                                    }))
+                                    phone: vendor.phone || null,
+                                    type: 'business',
+                                    businessType: 'store',
+                                    services: products
                                 }]}
-                                center={{ lat: vendor.lat, lng: vendor.lng }}
+                                center={vendor.lat && vendor.lng ? { lat: vendor.lat, lng: vendor.lng } : undefined}
                                 zoom={15}
                             />
                         </div>

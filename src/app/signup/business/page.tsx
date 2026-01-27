@@ -2,130 +2,304 @@
 
 import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
-import { ArrowRight, Check, Upload, MapPin, Smartphone, Mail, Store, Briefcase } from "lucide-react";
-import Link from "next/link";
-
+import { useState, useEffect } from "react";
+import { ArrowRight, Check, MapPin, Smartphone, Mail, Store, Briefcase, Loader2, AlertCircle, Clock, Map } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
+import LocationAutocomplete from "@/components/LocationAutocomplete";
+import FileUpload from "@/components/ui/FileUpload";
 
-// Steps for the wizard
-const STEPS = ["Identity", "Details", "Customization"];
+// --- VALIDATION SCHEMAS ---
+
+const existingUserSchema = z.object({
+    businessName: z.string().min(2, "Business name is required"),
+    category: z.string().min(1, "Category is required"),
+    description: z.string().min(10, "Description must be at least 10 characters"),
+    location: z.string().min(5, "Location is required"),
+    businessType: z.enum(["store", "service"]),
+    depositFee: z.string().optional().transform(val => (val === "" ? undefined : Number(val))),
+    // Refinement Fields
+    openingHours: z.string().optional(),
+    serviceRadius: z.string().optional(),
+    coverImage: z.string().optional(),
+    logo: z.string().optional(),
+});
+
+const newUserSchema = existingUserSchema.extend({
+    email: z.string().email("Invalid email address"),
+    phone: z.string().min(10, "Phone number required"),
+    password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type NewUserForm = z.infer<typeof newUserSchema>;
+type ExistingUserForm = z.infer<typeof existingUserSchema>;
+
+// Shared Input Components would go here or be imported. 
+// For this single file refactor, I'll inline cleaner versions.
 
 export default function BusinessSignupPage() {
     const router = useRouter();
+    const supabase = createClient();
+    const { showToast } = useToast();
 
-    // Import Supabase
-    // Import Supabase
+    const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Dynamic Form Setup
+    // We defer form init until we know auth state to pick schema
+    // But hooks order must be static. We'll use a wrapper or just use 'mode' to switch resolver.
+
+    const [authChecked, setAuthChecked] = useState(false);
+
+    useEffect(() => {
+        async function checkAuth() {
+            const { data } = await supabase.auth.getUser();
+            setIsLoggedIn(!!data.user);
+            setIsLoadingAuth(false);
+            setAuthChecked(true);
+        }
+        checkAuth();
 
 
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    }, [supabase]);
+
+    if (isLoadingAuth) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-neutral-400" />
+            </div>
+        );
+    }
+
+    return <BusinessWizard isLoggedIn={isLoggedIn} />;
+}
+
+
+function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
+    const router = useRouter();
+    const { showToast } = useToast();
+    const supabase = createClient();
+
+    // Steps configuration
+    const steps = isLoggedIn
+        ? ["Business Details", "Business Type", "Refinement"]
+        : ["Identity", "Business Details", "Business Type", "Refinement"];
 
     const [currentStep, setCurrentStep] = useState(0);
-    const [formData, setFormData] = useState({
-        email: "",
-        phone: "",
-        password: "",
-        businessName: "",
-        description: "",
-        category: "",
-        location: "",
-        businessType: "store", // 'store' (Physical) or 'service' (Mobile)
-        depositFee: "",
+    const [submitError, setSubmitError] = useState<string | null>(null);
+    const [profile, setProfile] = useState<any>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+
+    // Form Initialization
+    const {
+        control,
+        handleSubmit,
+        trigger,
+        watch,
+        formState: { errors, isValid }
+    } = useForm({
+        resolver: zodResolver(isLoggedIn ? existingUserSchema : newUserSchema),
+        mode: "onBlur",
+        defaultValues: {
+            // Business Defaults
+            businessName: "",
+            category: "",
+            description: "",
+            location: "",
+            businessType: "store",
+            depositFee: "",
+            openingHours: "Mon - Fri: 9:00 AM - 5:00 PM",
+            serviceRadius: "Within 10km of my location",
+            coverImage: "",
+            logo: "",
+            // Identity Defaults - Only included if not logged in
+            ...(isLoggedIn ? {} : {
+                email: "",
+                phone: "",
+                password: ""
+            })
+        }
     });
 
+    // Helper to calculate progress percentage
+    const progress = (currentStep / (steps.length - 1)) * 100;
+
     const handleNext = async () => {
-        if (currentStep < STEPS.length - 1) {
-            setCurrentStep(prev => prev + 1);
+        let stepValid = false;
+
+        // Validation per step
+        if (isLoggedIn) {
+            // Existing User Flow: Step 0 Details, 1 Type, 2 Refinement
+            if (currentStep === 0) stepValid = await trigger(["businessName", "category", "description", "location", "depositFee"]);
+            if (currentStep === 1) stepValid = true;
+            if (currentStep === 2) stepValid = true;
         } else {
-            // Complete Setup
-            setIsLoading(true);
-            setError(null);
+            // New User Flow: Step 0 Identity, 1 Details, 2 Type, 3 Refinement
+            if (currentStep === 0) stepValid = await trigger(["email", "phone", "password"] as any);
+            if (currentStep === 1) stepValid = await trigger(["businessName", "category", "description", "location", "depositFee"]);
+            if (currentStep === 2) stepValid = true;
+            if (currentStep === 3) stepValid = true;
+        }
 
-            try {
-                const supabase = createClient();
+        if (stepValid) {
+            setSubmitError(null);
+            if (currentStep < steps.length - 1) {
+                setCurrentStep(prev => prev + 1);
+            } else {
+                // Final Step -> Submit
+                handleSubmit(onSubmit)();
+            }
+        } else {
+            showToast("Please fix the errors before proceeding.", "error");
+        }
+    };
 
-                // 1. Sign Up User
-                // 1. Sign Up User (Trigger will create Profile & Business)
-                // Map UI 'businessType' to DB 'location_type'
-                const locationType = formData.businessType === 'store' ? 'physical' : 'mobile';
+    const handleBack = () => {
+        if (currentStep > 0) setCurrentStep(prev => prev - 1);
+    };
 
+    const onSubmit = async (data: any) => {
+        setIsSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            if (isLoggedIn) {
+                // 1. Existing User: Insert Business Only
+                const { data: userData } = await supabase.auth.getUser();
+                if (!userData.user) throw new Error("User session lost. Please login again.");
+
+                const { data: businessData, error: insertError } = await supabase.from("businesses").insert({
+                    owner_id: userData.user.id,
+                    name: data.businessName,
+                    category: data.category,
+                    description: data.description,
+                    location_address: data.location,
+                    lat: null, // Would need geocoding here ideally, or use NULL for now
+                    lng: null,
+                    location_type: data.businessType === "store" ? "physical" : "mobile",
+                    deposit_fee: data.depositFee || 0,
+                    phone: userData.user.user_metadata?.phone || null, // Best effort fallback
+                    email: userData.user.email,
+                    opening_hours: data.openingHours,
+                    service_radius: data.serviceRadius,
+                    cover_image_url: data.coverImage,
+                    image_url: data.logo
+                }).select().single();
+
+                if (insertError) throw insertError;
+                if (!businessData) throw new Error("Failed to retrieve business data after creation.");
+
+                showToast("Business Profile Created!");
+                router.refresh();
+                // Redirect to the SPECIFIC page based on type
+                const businessUrl = data.businessType === 'store'
+                    ? `/business/store/${businessData.id}`
+                    : `/business/service/${businessData.id}`;
+
+                router.push(businessUrl);
+
+            } else {
+                // 2. New User: Sign Up (Trigger handles Business Creation)
+                const locationType = data.businessType === 'store' ? 'physical' : 'mobile';
                 const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: formData.email,
-                    password: formData.password,
+                    email: data.email,
+                    password: data.password,
                     options: {
                         data: {
-                            full_name: formData.businessName, // Fallback/Owner name
+                            full_name: data.businessName,
                             role: 'business',
-                            phone: formData.phone,
-                            // Pass business details for the trigger
+                            phone: data.phone,
                             business_data: {
-                                name: formData.businessName,
-                                category: formData.category || 'General',
-                                description: formData.description,
-                                location_address: formData.location || 'Accra, Ghana',
+                                name: data.businessName,
+                                category: data.category,
+                                description: data.description,
+                                location_address: data.location,
                                 location_type: locationType,
-                                deposit_fee: formData.depositFee ? parseFloat(formData.depositFee) : 0,
-                                phone: formData.phone,
-                                email: formData.email
+                                deposit_fee: data.depositFee || 0,
+                                phone: data.phone,
+                                email: data.email,
+                                opening_hours: data.openingHours,
+                                service_radius: data.serviceRadius,
+                                cover_image_url: data.coverImage,
+                                image_url: data.logo
                             }
                         },
                     },
                 });
 
                 if (authError) throw authError;
-                if (!authData.user) throw new Error("No user returned");
-
-                // Manual insert removed - handled by DB trigger
 
                 if (authData.session) {
-                    // 3. Success -> Route
+                    showToast("Account Created!");
                     router.refresh();
-                    router.push(`/dashboard/${authData.user.id}`);
+                    router.push(`/dashboard/${authData.user?.id}`);
                 } else {
-                    // Email verification required
-                    router.push(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
+                    router.push(`/auth/verify-email?email=${encodeURIComponent(data.email)}`);
                 }
-
-            } catch (err: any) {
-                setError(err.message);
-                setIsLoading(false);
             }
+
+        } catch (err: any) {
+            console.error(err);
+            setSubmitError(err.message || "Failed to create account.");
+            showToast(err.message, "error");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleBack = () => {
-        if (currentStep > 0) {
-            setCurrentStep(prev => prev - 1);
+    const getStepContent = (step: number) => {
+        if (isLoggedIn) {
+            switch (step) {
+                case 0: return <StepDetails control={control} errors={errors} />;
+                case 1: return <StepCustomization control={control} />;
+                case 2: return <StepRefinement control={control} watch={watch} />;
+                default: return <div>Unknown Step</div>;
+            }
+        } else {
+            switch (step) {
+                case 0: return <StepIdentity control={control} errors={errors} />;
+                case 1: return <StepDetails control={control} errors={errors} />;
+                case 2: return <StepCustomization control={control} />;
+                case 3: return <StepRefinement control={control} watch={watch} />;
+                default: return <div>Unknown Step</div>;
+            }
         }
     };
 
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
             <Navigation />
-
             <div className="pt-32 pb-20 container-wide max-w-4xl mx-auto px-6">
-                {/* Progress Header */}
+                {/* Header */}
                 <div className="mb-12">
-                    <h1 className="font-heading text-4xl font-bold mb-6">Create Business Account</h1>
-                    <div className="flex items-center justify-between relative">
-                        {/* Progress Bar Background */}
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-neutral-100 dark:bg-neutral-800 -z-10" />
-                        {/* Active Progress */}
-                        <motion.div
-                            className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-black dark:bg-white -z-10 transition-all duration-500"
-                            style={{ width: `${(currentStep / (STEPS.length - 1)) * 100}%` }}
-                        />
-
-                        {error && (
-                            <div className="absolute -top-16 left-0 right-0 p-3 bg-red-100 border border-red-200 text-red-700 text-sm rounded-lg flex items-center justify-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                                {error}
+                    <div className="flex justify-between items-end mb-6">
+                        <h1 className="font-heading text-4xl font-bold">
+                            {isLoggedIn ? "Create New Business" : "Create Business Account"}
+                        </h1>
+                        {isLoggedIn && (
+                            <div className="text-right hidden md:block">
+                                <p className="text-xs text-neutral-500 uppercase tracking-wide">Logged in as</p>
+                                <p className="font-bold text-sm">{profile?.full_name?.split(' ')[0] || "User"}</p>
                             </div>
                         )}
+                    </div>
 
-                        {STEPS.map((step, index) => (
+                    {/* Progress Bar */}
+                    <div className="flex items-center justify-between relative">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-neutral-100 dark:bg-neutral-800 -z-10" />
+                        <motion.div
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-black dark:bg-white -z-10 transition-all duration-500"
+                            style={{ width: `${progress}%` }}
+                        />
+
+                        {steps.map((step, index) => (
                             <div key={step} className="flex flex-col items-center gap-2 bg-background px-2">
                                 <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors duration-300 ${index <= currentStep
@@ -135,7 +309,7 @@ export default function BusinessSignupPage() {
                                 >
                                     {index < currentStep ? <Check className="w-4 h-4" /> : index + 1}
                                 </div>
-                                <span className={`text-xs font-bold tracking-wider ${index <= currentStep ? "text-foreground" : "text-neutral-400"}`}>
+                                <span className={`text-xs font-bold tracking-wider ${index <= currentStep ? "text-foreground" : "text-neutral-300 dark:text-neutral-700"}`}>
                                     {step.toUpperCase()}
                                 </span>
                             </div>
@@ -143,7 +317,19 @@ export default function BusinessSignupPage() {
                     </div>
                 </div>
 
-                {/* Wizard Content */}
+                {/* Error Banner */}
+                {submitError && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400"
+                    >
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        <p className="text-sm font-medium">{submitError}</p>
+                    </motion.div>
+                )}
+
+                {/* Wizard Panel */}
                 <div className="glass-panel p-8 md:p-12 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-xl min-h-[400px]">
                     <AnimatePresence mode="wait">
                         <motion.div
@@ -153,15 +339,12 @@ export default function BusinessSignupPage() {
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.3 }}
                         >
-                            {currentStep === 0 && (
-                                <StepIdentity formData={formData} setFormData={setFormData} />
-                            )}
-                            {currentStep === 1 && (
-                                <StepDetails formData={formData} setFormData={setFormData} />
-                            )}
-                            {currentStep === 2 && (
-                                <StepCustomization formData={formData} setFormData={setFormData} />
-                            )}
+                            {/* 
+                                Step Mapping Logic:
+                                IF LoggedOut: 0=Identity, 1=Details, 2=Customization, 3=Refinement
+                                IF LoggedIn:  0=Details, 1=Customization, 2=Refinement
+                            */}
+                            {getStepContent(currentStep)}
                         </motion.div>
                     </AnimatePresence>
 
@@ -169,166 +352,346 @@ export default function BusinessSignupPage() {
                     <div className="flex justify-between mt-12 pt-8 border-t border-neutral-100 dark:border-neutral-800">
                         <button
                             onClick={handleBack}
-                            disabled={currentStep === 0}
-                            className={`px-6 py-3 text-sm font-bold tracking-wide rounded-full transition-opacity ${currentStep === 0 ? "opacity-0 pointer-events-none" : "hover:opacity-60"
-                                }`}
+                            disabled={currentStep === 0 || isSubmitting}
+                            className={`px-6 py-3 text-sm font-bold tracking-wide rounded-full transition-opacity ${currentStep === 0 ? "opacity-0 pointer-events-none" : "hover:opacity-60"}`}
                         >
                             BACK
                         </button>
                         <button
                             onClick={handleNext}
-                            disabled={isLoading}
-                            className="bg-foreground text-background px-8 py-3 text-sm font-bold tracking-wide rounded-full hover:opacity-80 transition-opacity flex items-center gap-2 disabled:opacity-50"
+                            disabled={isSubmitting}
+                            className="bg-foreground text-background px-8 py-3 text-sm font-bold tracking-wide rounded-full hover:opacity-80 transition-opacity flex items-center gap-2 disabled:opacity-50 min-w-[160px] justify-center"
                         >
-                            {isLoading ? "CREATING..." : currentStep === STEPS.length - 1 ? "COMPLETE SETUP" : "NEXT STEP"}
-                            {!isLoading && <ArrowRight className="w-4 h-4" />}
+                            {isSubmitting ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <>
+                                    {currentStep === steps.length - 1 ? (isLoggedIn ? "CREATE BUSINESS" : "COMPLETE SETUP") : "NEXT STEP"}
+                                    <ArrowRight className="w-4 h-4" />
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
+
+                {!isLoggedIn && (
+                    <div className="mt-8 text-center text-sm text-neutral-500">
+                        Already have an account? <Link href="/login" className="font-bold underline hover:text-black dark:hover:text-white">Log in</Link> and create a business from there.
+                    </div>
+                )}
             </div>
         </main>
     );
 }
 
-// --- Icons & Types ---
-// (Normally separated files, kept here for brevity in initial scaffold)
+// --- SUB-COMPONENTS (With React Hook Form Control) ---
 
-function StepIdentity({ formData, setFormData }: any) {
+function StepIdentity({ control, errors }: any) {
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold font-heading">Verify Identity</h2>
-            <p className="text-neutral-500">We need to verify it's you before setting up your business profile.</p>
+            <p className="text-neutral-500">Secure your account before setting up your business profile.</p>
 
             <div className="grid gap-6">
-                <div className="space-y-2">
-                    <label className="text-sm font-bold ml-1 flex items-center gap-2"><Mail className="w-4 h-4" /> EMAIL ADDRESS</label>
-                    <input
-                        value={formData.email}
-                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full bg-neutral-50 dark:bg-neutral-900 border-none p-4 rounded-xl outline-none focus:ring-1 ring-black dark:ring-white"
-                        placeholder="business@example.com"
-                    />
-                    <p className="text-xs text-green-600 font-medium ml-1 hidden">✓ Verified via link</p>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-bold ml-1 flex items-center gap-2"><Smartphone className="w-4 h-4" /> PHONE NUMBER</label>
-                    <div className="flex gap-2">
-                        <span className="bg-neutral-100 dark:bg-neutral-800 p-4 rounded-xl text-sm font-bold flex items-center">+233</span>
-                        <input
-                            value={formData.phone}
-                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                            className="w-full bg-neutral-50 dark:bg-neutral-900 border-none p-4 rounded-xl outline-none focus:ring-1 ring-black dark:ring-white"
-                            placeholder="XX XXX XXXX"
-                        />
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-bold ml-1 flex items-center gap-2">PASSWORD</label>
-                    <input
-                        type="password"
-                        value={formData.password}
-                        onChange={e => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full bg-neutral-50 dark:bg-neutral-900 border-none p-4 rounded-xl outline-none focus:ring-1 ring-black dark:ring-white"
-                        placeholder="Create a strong password"
-                    />
-                </div>
+                <Controller
+                    name="email"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1 flex items-center gap-2"><Mail className="w-4 h-4" /> EMAIL ADDRESS</label>
+                            <input
+                                {...field}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                placeholder="business@example.com"
+                                type="email"
+                            />
+                            {errors.email && <p className="text-xs text-red-500 font-bold ml-1">{errors.email.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
+                    name="phone"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1 flex items-center gap-2"><Smartphone className="w-4 h-4" /> PHONE NUMBER</label>
+                            <div className="flex gap-2">
+                                <span className="bg-neutral-100 dark:bg-neutral-800 p-4 rounded-xl text-sm font-bold flex items-center">+233</span>
+                                <input
+                                    {...field}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors flex-1"
+                                    placeholder="XX XXX XXXX"
+                                    type="tel"
+                                />
+                            </div>
+                            {errors.phone && <p className="text-xs text-red-500 font-bold ml-1">{errors.phone.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
+                    name="password"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1 gap-2">PASSWORD</label>
+                            <input
+                                {...field}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                placeholder="Create a strong password"
+                                type="password"
+                            />
+                            {errors.password && <p className="text-xs text-red-500 font-bold ml-1">{errors.password.message}</p>}
+                        </div>
+                    )}
+                />
             </div>
         </div>
     );
 }
 
-function StepDetails({ formData, setFormData }: any) {
+function StepDetails({ control, errors }: any) {
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold font-heading">Business Details</h2>
             <div className="space-y-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-bold ml-1">BUSINESS NAME</label>
-                    <input
-                        value={formData.businessName}
-                        onChange={e => setFormData({ ...formData, businessName: e.target.value })}
-                        className="w-full bg-neutral-50 dark:bg-neutral-900 border-none p-4 rounded-xl outline-none focus:ring-1 ring-black dark:ring-white"
-                        placeholder="Official Business Name"
-                    />
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-bold ml-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> HEADQUARTERS LOCATION</label>
-                    <button
-                        className="w-full bg-neutral-100 dark:bg-neutral-800 p-4 rounded-xl text-left text-sm font-medium flex items-center justify-between hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-                        onClick={() => alert("Requesting Location Access...")}
-                    >
-                        <span>Accra, Ghana (Detected)</span>
-                        <span className="text-xs font-bold bg-white dark:bg-black px-2 py-1 rounded">ENABLE LOCATION</span>
-                    </button>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-bold ml-1">BOOKING DEPOSIT FEE (GH₵)</label>
-                    <input
-                        type="number"
-                        value={formData.depositFee}
-                        onChange={e => setFormData({ ...formData, depositFee: e.target.value })}
-                        className="w-full bg-neutral-50 dark:bg-neutral-900 border-none p-4 rounded-xl outline-none focus:ring-1 ring-black dark:ring-white"
-                        placeholder="e.g. 50 (Leave empty for no deposit)"
-                    />
-                    <p className="text-xs text-neutral-500 ml-1">Non-refundable fee to secure appointments.</p>
-                </div>
+                <Controller
+                    name="businessName"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1">BUSINESS NAME</label>
+                            <input
+                                {...field}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                placeholder="Official Business Name"
+                            />
+                            {errors.businessName && <p className="text-xs text-red-500 font-bold ml-1">{errors.businessName.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
+                    name="category"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1">CATEGORY</label>
+                            <select
+                                {...field}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors appearance-none"
+                            >
+                                <option value="">Select Category...</option>
+                                <option value="Beauty & Spa">Beauty & Spa</option>
+                                <option value="Home Services">Home Services</option>
+                                <option value="Health & Wellness">Health & Wellness</option>
+                                <option value="Events">Events</option>
+                                <option value="Automotive">Automotive</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            {errors.category && <p className="text-xs text-red-500 font-bold ml-1">{errors.category.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
+                    name="description"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1">DESCRIPTION</label>
+                            <textarea
+                                {...field}
+                                rows={3}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors resize-none"
+                                placeholder="Briefly describe what your business does..."
+                            />
+                            {errors.description && <p className="text-xs text-red-500 font-bold ml-1">{errors.description.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
+                    name="location"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> HEADQUARTERS LOCATION</label>
+                            <div className="relative">
+                                <LocationAutocomplete
+                                    onSelect={(loc) => field.onChange(loc.address)}
+                                    placeholder="Search for location..."
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                />
+                            </div>
+                            {errors.location && <p className="text-xs text-red-500 font-bold ml-1">{errors.location.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
+                    name="depositFee"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1">BOOKING DEPOSIT FEE (GH₵)</label>
+                            <input
+                                {...field}
+                                type="number"
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                placeholder="e.g. 50 (Leave empty for no deposit)"
+                            />
+                            <p className="text-xs text-neutral-500 ml-1">Non-refundable fee to secure appointments.</p>
+                        </div>
+                    )}
+                />
             </div>
         </div>
     );
 }
 
-
-function StepCustomization({ formData, setFormData }: any) {
+function StepCustomization({ control }: any) {
     return (
         <div className="space-y-6">
             <h2 className="text-2xl font-bold font-heading">Customize Your Page</h2>
             <p className="text-neutral-500">Choose a layout that fits your business model.</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Product Variant */}
-                <div
-                    onClick={() => setFormData({ ...formData, businessType: 'store' })}
-                    className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${formData.businessType === 'store'
-                        ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
-                        : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
-                        }`}
-                >
-                    <div className="h-32 bg-neutral-200 dark:bg-neutral-800 rounded-xl mb-4 relative overflow-hidden">
-                        <div className="absolute inset-2 grid grid-cols-2 gap-2">
-                            <div className="bg-white/50 rounded-lg"></div>
-                            <div className="bg-white/50 rounded-lg"></div>
-                            <div className="bg-white/50 rounded-lg"></div>
-                            <div className="bg-white/50 rounded-lg"></div>
+            <Controller
+                name="businessType"
+                control={control}
+                render={({ field }) => (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Store Variant */}
+                        <div
+                            onClick={() => field.onChange('store')}
+                            className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${field.value === 'store'
+                                ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
+                                : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                }`}
+                        >
+                            <div className="h-32 bg-neutral-200 dark:bg-neutral-800 rounded-xl mb-4 relative overflow-hidden flex items-center justify-center">
+                                <Store className={`w-12 h-12 ${field.value === 'store' ? 'text-black dark:text-white' : 'text-neutral-400'}`} />
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="font-bold text-sm">Physical Location</span>
+                                {field.value === 'store' && <Check className="w-4 h-4 text-green-600" />}
+                            </div>
+                            <p className="text-xs text-neutral-500">For businesses with a physical shop, studio, or office customers visit.</p>
+                        </div>
+
+                        {/* Service Variant */}
+                        <div
+                            onClick={() => field.onChange('service')}
+                            className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${field.value === 'service'
+                                ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
+                                : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                }`}
+                        >
+                            <div className="h-32 bg-neutral-200 dark:bg-neutral-800 rounded-xl mb-4 relative overflow-hidden flex items-center justify-center">
+                                <Briefcase className={`w-12 h-12 ${field.value === 'service' ? 'text-black dark:text-white' : 'text-neutral-400'}`} />
+                            </div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="font-bold text-sm">Mobile / Remote</span>
+                                {field.value === 'service' && <Check className="w-4 h-4 text-green-600" />}
+                            </div>
+                            <p className="text-xs text-neutral-500">For businesses that travel to customers or operate without a public storefront.</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Store className="w-4 h-4" />
-                        <span className="font-bold text-sm">Flagship Store</span>
-                    </div>
-                    <p className="text-xs text-neutral-500">For businesses with a physical location. Showcase your space and inventory.</p>
-                </div>
+                )}
+            />
+        </div>
+    );
+}
 
-                {/* Service Variant */}
-                <div
-                    onClick={() => setFormData({ ...formData, businessType: 'service' })}
-                    className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${formData.businessType === 'service'
-                        ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
-                        : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
-                        }`}
-                >
-                    <div className="h-32 bg-neutral-200 dark:bg-neutral-800 rounded-xl mb-4 relative overflow-hidden flex flex-col gap-2 p-2 justify-center">
-                        <div className="h-4 w-3/4 bg-white/50 rounded mb-2"></div>
-                        <div className="h-2 w-full bg-white/50 rounded"></div>
-                        <div className="h-2 w-5/6 bg-white/50 rounded"></div>
-                        <div className="h-8 w-1/3 bg-black/20 rounded mt-2"></div>
-                    </div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Briefcase className="w-4 h-4" />
-                        <span className="font-bold text-sm">Mobile Service</span>
-                    </div>
-                    <p className="text-xs text-neutral-500">For door-to-door services or businesses without a flagship store.</p>
+function StepRefinement({ control, watch }: any) {
+    const businessType = watch('businessType');
+
+    return (
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold font-heading">
+                {businessType === 'store' ? "Store Configuration" : "Service Preferences"}
+            </h2>
+            <p className="text-neutral-500">
+                {businessType === 'store'
+                    ? "Let customers know when they can visit."
+                    : "Tell us a bit more about how you operate."}
+            </p>
+
+            {businessType === 'store' ? (
+                <div className="space-y-4">
+                    <Controller
+                        name="openingHours"
+                        control={control}
+                        render={({ field }) => (
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold ml-1 flex items-center gap-2"><Clock className="w-4 h-4" /> STANDARD OPENING HOURS</label>
+                                <input
+                                    {...field}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                    placeholder="e.g. Mon - Fri: 9am - 5pm"
+                                />
+                                <p className="text-xs text-neutral-500 ml-1">You can set detailed hours later in your dashboard.</p>
+                            </div>
+                        )}
+                    />
+
+                    <Controller
+                        name="coverImage"
+                        control={control}
+                        render={({ field }) => (
+                            <FileUpload
+                                label="FLAGSHIP STORE IMAGE"
+                                value={field.value}
+                                onChange={field.onChange}
+                            />
+                        )}
+                    />
                 </div>
-            </div>
+            ) : (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <Controller
+                            name="logo"
+                            control={control}
+                            render={({ field }) => (
+                                <FileUpload
+                                    label="BUSINESS LOGO"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        />
+                        <Controller
+                            name="coverImage"
+                            control={control}
+                            render={({ field }) => (
+                                <FileUpload
+                                    label="COVER PHOTO"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                />
+                            )}
+                        />
+                    </div>
+
+                    <Controller
+                        name="serviceRadius"
+                        control={control}
+                        render={({ field }) => (
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold ml-1 flex items-center gap-2"><Map className="w-4 h-4" /> SERVICE RADIUS / AREA</label>
+                                <input
+                                    {...field}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                    placeholder="e.g. Greater Accra Region"
+                                />
+                                <p className="text-xs text-neutral-500 ml-1">Where are you willing to travel to?</p>
+                            </div>
+                        )}
+                    />
+                </div>
+            )}
         </div>
     );
 }

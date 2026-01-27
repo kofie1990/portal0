@@ -184,7 +184,7 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
                     </Marker>
                 )}
 
-                {items.map((item) => (
+                {items.filter(item => item && typeof item.lat === 'number' && typeof item.lng === 'number').map((item) => (
                     <Marker
                         key={`${item.type}-${item.id}`}
                         position={[item.lat, item.lng]}
