@@ -219,7 +219,7 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
 
                     <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 px-1 no-scrollbar pointer-events-auto">
                         {/* Profile/Business Card (First Card) */}
-                        <div className="min-w-[280px] md:min-w-[320px] bg-white rounded-2xl shadow-xl border border-neutral-100 overflow-hidden snap-center flex-shrink-0">
+                        <div className="min-w-[280px] w-[85vw] max-w-[320px] md:w-[320px] bg-white rounded-2xl shadow-xl border border-neutral-100 overflow-hidden snap-center flex-shrink-0">
                             <div className={`h-32 w-full ${selectedItem.image || 'bg-neutral-200'} relative`}>
                                 {selectedItem.imageUrl && (
                                     <img src={selectedItem.imageUrl} alt={selectedItem.name} className="w-full h-full object-cover" />
