@@ -24,6 +24,7 @@ export interface Database {
                     location_text: string | null // Added
                     lat: number | null
                     lng: number | null
+                    paystack_subaccount_code: string | null // Added
                 }
                 Insert: {
                     id: string
@@ -37,6 +38,7 @@ export interface Database {
                     bio?: string | null
                     email?: string | null
                     location_text?: string | null // Added
+                    paystack_subaccount_code?: string | null // Added
                 }
                 Update: {
                     id?: string
@@ -50,6 +52,7 @@ export interface Database {
                     bio?: string | null
                     email?: string | null
                     location_text?: string | null // Added
+                    paystack_subaccount_code?: string | null // Added
                 }
             }
             businesses: {

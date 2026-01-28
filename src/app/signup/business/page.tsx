@@ -13,6 +13,9 @@ import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import FileUpload from "@/components/ui/FileUpload";
+import { createSubaccountAction, fetchBanksAction, verifyAccountAction } from "@/app/actions/paystack";
+import { PaystackBank } from "@/lib/paystack";
+import PayoutSection from "./PayoutSection";
 
 // --- VALIDATION SCHEMAS ---
 
@@ -23,18 +26,42 @@ const existingUserSchema = z.object({
     location: z.string().min(5, "Location is required"),
     businessType: z.enum(["store", "service"]),
     depositFee: z.string().optional().transform(val => (val === "" ? undefined : Number(val))),
+    bio: z.string().max(160, "Bio must be under 160 characters").optional(), // [NEW]
+    website: z.string().url("Invalid URL").optional().or(z.literal("")), // [NEW]
+    socialInstagram: z.string().optional(), // [NEW]
+    socialFacebook: z.string().optional(), // [NEW]
+    mapUrl: z.string().optional(), // [NEW]
+    // Payout Details
+    bankCode: z.string().min(1, "Bank is required"),
+    accountNumber: z.string().min(10, "Account number is required"),
+    accountName: z.string().min(3, "Account name is required"), // Read-only but required
     // Refinement Fields
     openingHours: z.string().optional(),
     serviceRadius: z.string().optional(),
-    coverImage: z.string().optional(),
+    coverImage: z.string().min(1, "Cover image is required"),
     logo: z.string().optional(),
 });
+
+// Refinement logic to ensure Logo is present for Service businesses
+const validateBusinessImages = (data: any, ctx: z.RefinementCtx) => {
+    if (data.businessType === "service" && !data.logo) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Business logo is required",
+            path: ["logo"],
+        });
+    }
+};
+
+const existingUserSchemaRefined = existingUserSchema.superRefine(validateBusinessImages);
 
 const newUserSchema = existingUserSchema.extend({
     email: z.string().email("Invalid email address"),
     phone: z.string().min(10, "Phone number required"),
     password: z.string().min(6, "Password must be at least 6 characters"),
 });
+
+const newUserSchemaRefined = newUserSchema.superRefine(validateBusinessImages);
 
 type NewUserForm = z.infer<typeof newUserSchema>;
 type ExistingUserForm = z.infer<typeof existingUserSchema>;
@@ -103,9 +130,10 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
         handleSubmit,
         trigger,
         watch,
+        setValue,
         formState: { errors, isValid }
     } = useForm({
-        resolver: zodResolver(isLoggedIn ? existingUserSchema : newUserSchema),
+        resolver: zodResolver(isLoggedIn ? existingUserSchemaRefined : newUserSchemaRefined),
         mode: "onBlur",
         defaultValues: {
             // Business Defaults
@@ -115,6 +143,17 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
             location: "",
             businessType: "store",
             depositFee: "",
+            // [NEW] Fields
+            bio: "",
+            website: "",
+            socialInstagram: "",
+            socialFacebook: "",
+            mapUrl: "",
+            // Payout
+            bankCode: "",
+            accountNumber: "",
+            accountName: "",
+            // Refinement
             openingHours: "Mon - Fri: 9:00 AM - 5:00 PM",
             serviceRadius: "Within 10km of my location",
             coverImage: "",
@@ -170,8 +209,20 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
         setSubmitError(null);
 
         try {
+            // 1. Create Paystack Subaccount
+            const subResult = await createSubaccountAction(
+                data.businessName,
+                data.bankCode,
+                data.accountNumber,
+                `Subaccount for ${data.businessName}`,
+                data.email || undefined // email might be in user metadata if logged in, but passed in data for new users
+            );
+
+            if (subResult.error) throw new Error(subResult.error);
+            const subaccountCode = subResult.data?.subaccount_code;
+
             if (isLoggedIn) {
-                // 1. Existing User: Insert Business Only
+                // 2. Existing User: Insert Business Only
                 const { data: userData } = await supabase.auth.getUser();
                 if (!userData.user) throw new Error("User session lost. Please login again.");
 
@@ -179,18 +230,26 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                     owner_id: userData.user.id,
                     name: data.businessName,
                     category: data.category,
+                    bio: data.bio, // [NEW]
                     description: data.description,
                     location_address: data.location,
-                    lat: null, // Would need geocoding here ideally, or use NULL for now
+                    lat: null,
                     lng: null,
                     location_type: data.businessType === "store" ? "physical" : "mobile",
                     deposit_fee: data.depositFee || 0,
-                    phone: userData.user.user_metadata?.phone || null, // Best effort fallback
+                    phone: userData.user.user_metadata?.phone || null,
                     email: userData.user.email,
                     opening_hours: data.openingHours,
                     service_radius: data.serviceRadius,
                     cover_image_url: data.coverImage,
-                    image_url: data.logo
+                    image_url: data.logo,
+                    website: data.website, // [NEW]
+                    paystack_subaccount_code: subaccountCode, // [NEW] [UPDATED]
+                    iframe_map_url: data.mapUrl, // [NEW]
+                    social_links: { // [NEW]
+                        instagram: data.socialInstagram,
+                        facebook: data.socialFacebook
+                    }
                 }).select().single();
 
                 if (insertError) throw insertError;
@@ -206,7 +265,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                 router.push(businessUrl);
 
             } else {
-                // 2. New User: Sign Up (Trigger handles Business Creation)
+                // 3. New User: Sign Up (Trigger handles Business Creation)
                 const locationType = data.businessType === 'store' ? 'physical' : 'mobile';
                 const { data: authData, error: authError } = await supabase.auth.signUp({
                     email: data.email,
@@ -216,9 +275,11 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                             full_name: data.businessName,
                             role: 'business',
                             phone: data.phone,
+                            subaccount_code: subaccountCode, // Save to metadata as backup
                             business_data: {
                                 name: data.businessName,
                                 category: data.category,
+                                bio: data.bio, // [NEW]
                                 description: data.description,
                                 location_address: data.location,
                                 location_type: locationType,
@@ -228,7 +289,14 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                                 opening_hours: data.openingHours,
                                 service_radius: data.serviceRadius,
                                 cover_image_url: data.coverImage,
-                                image_url: data.logo
+                                image_url: data.logo,
+                                website: data.website, // [NEW]
+                                paystack_subaccount_code: subaccountCode, // [NEW] [UPDATED]
+                                iframe_map_url: data.mapUrl, // [NEW]
+                                social_links: { // [NEW]
+                                    instagram: data.socialInstagram,
+                                    facebook: data.socialFacebook
+                                }
                             }
                         },
                     },
@@ -259,7 +327,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
             switch (step) {
                 case 0: return <StepDetails control={control} errors={errors} />;
                 case 1: return <StepCustomization control={control} />;
-                case 2: return <StepRefinement control={control} watch={watch} />;
+                case 2: return <StepRefinement control={control} watch={watch} setValue={setValue} />;
                 default: return <div>Unknown Step</div>;
             }
         } else {
@@ -267,7 +335,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                 case 0: return <StepIdentity control={control} errors={errors} />;
                 case 1: return <StepDetails control={control} errors={errors} />;
                 case 2: return <StepCustomization control={control} />;
-                case 3: return <StepRefinement control={control} watch={watch} />;
+                case 3: return <StepRefinement control={control} watch={watch} setValue={setValue} />;
                 default: return <div>Unknown Step</div>;
             }
         }
@@ -496,6 +564,22 @@ function StepDetails({ control, errors }: any) {
                 />
 
                 <Controller
+                    name="bio"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1">TAGLINE / BIO</label>
+                            <input
+                                {...field}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                placeholder="Short catchy slogan (e.g. 'Best Jollof in Accra')"
+                            />
+                            {errors.bio && <p className="text-xs text-red-500 font-bold ml-1">{errors.bio.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
                     name="description"
                     control={control}
                     render={({ field }) => (
@@ -604,7 +688,7 @@ function StepCustomization({ control }: any) {
     );
 }
 
-function StepRefinement({ control, watch }: any) {
+function StepRefinement({ control, watch, setValue }: any) {
     const businessType = watch('businessType');
 
     return (
@@ -647,6 +731,25 @@ function StepRefinement({ control, watch }: any) {
                             />
                         )}
                     />
+
+                    <div className="pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                        <h3 className="font-bold text-lg mb-4">Location Details</h3>
+                        <Controller
+                            name="mapUrl"
+                            control={control}
+                            render={({ field }) => (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold ml-1">GOOGLE MAPS EMBED URL (Optional)</label>
+                                    <input
+                                        {...field}
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                        placeholder="<iframe src='...'>"
+                                    />
+                                    <p className="text-xs text-neutral-500 ml-1">Paste the embed code from Google Maps to show your exact location on page.</p>
+                                </div>
+                            )}
+                        />
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -692,6 +795,58 @@ function StepRefinement({ control, watch }: any) {
                     />
                 </div>
             )}
+
+            {/* Online Presence Section */}
+            <div className="pt-6 border-t border-neutral-100 dark:border-neutral-800">
+                <h3 className="font-bold text-lg mb-4">Online Presence</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Controller
+                        name="website"
+                        control={control}
+                        render={({ field }) => (
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold ml-1">WEBSITE</label>
+                                <input
+                                    {...field}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                    placeholder="https://"
+                                />
+                            </div>
+                        )}
+                    />
+                    <Controller
+                        name="socialInstagram"
+                        control={control}
+                        render={({ field }) => (
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold ml-1">INSTAGRAM HANDLE</label>
+                                <input
+                                    {...field}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                    placeholder="@username"
+                                />
+                            </div>
+                        )}
+                    />
+                    <Controller
+                        name="socialFacebook"
+                        control={control}
+                        render={({ field }) => (
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold ml-1">FACEBOOK PAGE</label>
+                                <input
+                                    {...field}
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                    placeholder="Page Name or URL"
+                                />
+                            </div>
+                        )}
+                    />
+                </div>
+            </div>
+
+            {/* Payout Section */}
+            <PayoutSection control={control} watch={watch} setValue={setValue} />
         </div>
     );
 }

@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import { useToast } from "@/components/ui/Toast";
+import StepPayout from "./StepPayout";
+import { createSubaccountAction } from "@/app/actions/paystack";
 
 // MOCK INTERESTS
 const INTERESTS = [
@@ -38,6 +40,11 @@ export default function OnboardingFlow() {
     const [bio, setBio] = useState("");
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+    // Payout State
+    const [bankCode, setBankCode] = useState("");
+    const [accountNumber, setAccountNumber] = useState("");
+    const [accountName, setAccountName] = useState("");
 
     const handleInterestToggle = (id: string) => {
         if (selectedInterests.includes(id)) {
@@ -100,6 +107,29 @@ export default function OnboardingFlow() {
                 updates.avatar_url = uploadedAvatarUrl;
             }
 
+            // Create Paystack Subaccount for Individual
+            if (bankCode && accountNumber && accountName) {
+                const subResult = await createSubaccountAction(
+                    `${user.user_metadata?.full_name || 'Individual'} (${accountName})`,
+                    bankCode,
+                    accountNumber,
+                    `Individual Subaccount for ${user.email}`,
+                    user.email || undefined
+                );
+
+                if (subResult.data?.subaccount_code) {
+                    updates.paystack_subaccount_code = subResult.data.subaccount_code;
+                    // Also update user metadata
+                    await supabase.auth.updateUser({
+                        data: { subaccount_code: subResult.data.subaccount_code }
+                    });
+                } else {
+                    console.error("Failed to create subaccount:", subResult.error);
+                    // Decide if we should block or continue. Let's continue but warn.
+                    showToast("Could not create payout account. You can retry in settings.", "error");
+                }
+            }
+
             const { error } = await supabase
                 .from('profiles')
                 .update(updates)
@@ -156,13 +186,26 @@ export default function OnboardingFlow() {
                             />
                         )}
                         {step === 3 && (
+                            <StepPayout
+                                key="payout"
+                                bankCode={bankCode}
+                                setBankCode={setBankCode}
+                                accountNumber={accountNumber}
+                                setAccountNumber={setAccountNumber}
+                                accountName={accountName}
+                                setAccountName={setAccountName}
+                                onNext={() => setStep(4)}
+                                onBack={() => setStep(2)}
+                            />
+                        )}
+                        {step === 4 && (
                             <StepInterests
                                 key="interests"
                                 interests={INTERESTS}
                                 selected={selectedInterests}
                                 toggle={handleInterestToggle}
                                 onComplete={handleComplete}
-                                onBack={() => setStep(2)}
+                                onBack={() => setStep(3)}
                                 isLoading={isLoading}
                             />
                         )}

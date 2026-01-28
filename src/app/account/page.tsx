@@ -594,7 +594,7 @@ export default function AccountPage() {
                                                                         <Settings className="w-3 h-3" /> Dashboard
                                                                     </button>
                                                                 </Link>
-                                                                <Link href={`/business/service/${business.id}`}>
+                                                                <Link href={business.location_type === 'physical' ? `/business/store/${business.id}` : `/business/service/${business.id}`}>
                                                                     <button className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                                                                         <ExternalLink className="w-3 h-3" /> View Live
                                                                     </button>
@@ -810,6 +810,6 @@ export default function AccountPage() {
                 onPostpone={handlePostponeBooking}
                 currentUserId={user?.id}
             />
-        </main>
+        </main >
     );
 }

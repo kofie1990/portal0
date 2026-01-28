@@ -2,7 +2,7 @@
 
 import Navigation from "@/components/Navigation";
 import { motion } from "framer-motion";
-import { ShoppingBag, Star, Share2, Heart } from "lucide-react";
+import { ShoppingBag, Star, Share2, Heart, Globe, Instagram, Facebook } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -48,6 +48,9 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                     lng: b.lng,
                     bio: b.bio || "Welcome to our flagship store.",
                     openNow: b.open_now,
+                    website: b.website, // [NEW]
+                    socials: b.social_links, // [NEW]
+                    mapUrl: b.iframe_map_url, // [NEW]
                     type: 'business',
                     businessType: 'store'
                 });
@@ -115,29 +118,33 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8 }}
-                        className="flex flex-col md:flex-row justify-between items-end border-b border-neutral-200 dark:border-neutral-800 pb-8 mb-12"
+                        className="border-b border-neutral-200 dark:border-neutral-800 pb-8 mb-12"
                     >
-                        <div>
-                            <span className="text-xs font-bold tracking-[0.2em] text-neutral-500 mb-2 block">{vendor.category?.toUpperCase() || 'STORE'}</span>
-                            <h1 className="font-heading text-5xl md:text-7xl font-bold mb-4">{vendor.name}.</h1>
-                            <div className="flex items-center gap-4 text-sm font-medium">
-                                <span className="flex items-center gap-1"><Star className="w-4 h-4 fill-black dark:fill-white" /> {vendor.rating} ({vendor.reviews || 0} Reviews)</span>
-                                <span className="text-neutral-400">•</span>
-                                <span>{vendor.location}</span>
-                                <span className="text-neutral-400">•</span>
-                                <span className={vendor.openNow ? "text-green-600" : "text-red-500"}>{vendor.openNow ? 'Open Now' : 'Closed'}</span>
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                            <div className="flex-1">
+                                <span className="text-xs font-bold tracking-[0.2em] text-neutral-500 mb-2 block">{vendor.category?.toUpperCase() || 'STORE'}</span>
+                                <h1 className="font-heading text-5xl md:text-7xl font-bold mb-4">{vendor.name}.</h1>
+                                <div className="flex items-center gap-4 text-sm font-medium flex-wrap">
+                                    <span className="flex items-center gap-1"><Star className="w-4 h-4 fill-black dark:fill-white" /> {vendor.rating} ({vendor.reviews || 0} Reviews)</span>
+                                    <span className="text-neutral-400">•</span>
+                                    <span>{vendor.location}</span>
+                                    <span className="text-neutral-400">•</span>
+                                    <span className={vendor.openNow ? "text-green-600" : "text-red-500"}>{vendor.openNow ? 'Open Now' : 'Closed'}</span>
+                                </div>
+                                {vendor.bio && <p className="text-neutral-500 max-w-xl mt-6 text-lg leading-relaxed">{vendor.bio}</p>}
                             </div>
-                        </div>
-                        <div className="flex gap-3 mt-6 md:mt-0">
-                            <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
-                                <Share2 className="w-5 h-5" />
-                            </button>
-                            <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
-                                <Heart className="w-5 h-5" />
-                            </button>
-                            <Link href={`/book?vendorId=${vendor.id}&type=store`} className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
-                                BOOK APPOINTMENT
-                            </Link>
+
+                            <div className="flex gap-3">
+                                <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
+                                    <Share2 className="w-5 h-5" />
+                                </button>
+                                <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
+                                    <Heart className="w-5 h-5" />
+                                </button>
+                                <Link href={`/book?vendorId=${vendor.id}&type=store`} className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
+                                    BOOK APPOINTMENT
+                                </Link>
+                            </div>
                         </div>
                     </motion.div>
 
@@ -189,43 +196,79 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
 
                 {/* Location Map Section */}
                 <div className="mt-24 border-t border-neutral-200 dark:border-neutral-800 pt-12">
-                    <h3 className="font-heading text-2xl font-bold mb-8">Visit The Concept Store</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="md:col-span-1 space-y-4">
-                            <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl">
-                                <h4 className="font-bold mb-2">Address</h4>
-                                <p className="text-neutral-500 text-sm leading-relaxed">
-                                    {vendor.address}
-                                </p>
+                    <div className="container-wide">
+                        <h3 className="font-heading text-2xl font-bold mb-8">Visit The Concept Store</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="md:col-span-1 space-y-4">
+                                <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl">
+                                    <h4 className="font-bold mb-2">Address</h4>
+                                    <p className="text-neutral-500 text-sm leading-relaxed">
+                                        {vendor.address}
+                                    </p>
+                                </div>
+                                <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl">
+                                    <h4 className="font-bold mb-2">Hours</h4>
+                                    <ul className="text-neutral-500 text-sm space-y-1">
+                                        <li className="flex justify-between"><span>Mon-Fri</span> <span>10am - 8pm</span></li>
+                                        <li className="flex justify-between"><span>Saturday</span> <span>10am - 6pm</span></li>
+                                        <li className="flex justify-between"><span>Sunday</span> <span>Closed</span></li>
+                                    </ul>
+                                </div>
+
+                                {/* Contact & Socials */}
+                                {(vendor.website || vendor.socials) && (
+                                    <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl space-y-3">
+                                        <h4 className="font-bold mb-2">Connect</h4>
+                                        {vendor.website && (
+                                            <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-neutral-600 hover:text-black dark:text-neutral-400 dark:hover:text-white transition-colors">
+                                                <Globe className="w-4 h-4" /> Website
+                                            </a>
+                                        )}
+                                        {vendor.socials?.instagram && (
+                                            <a href={`https://instagram.com/${vendor.socials.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-neutral-600 hover:text-pink-600 dark:text-neutral-400 dark:hover:text-pink-400 transition-colors">
+                                                <Instagram className="w-4 h-4" /> {vendor.socials.instagram}
+                                            </a>
+                                        )}
+                                        {vendor.socials?.facebook && (
+                                            <a href={vendor.socials.facebook} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-neutral-600 hover:text-blue-600 dark:text-neutral-400 dark:hover:text-blue-400 transition-colors">
+                                                <Facebook className="w-4 h-4" /> Facebook
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            <div className="p-6 bg-neutral-100 dark:bg-neutral-900 rounded-2xl">
-                                <h4 className="font-bold mb-2">Hours</h4>
-                                <ul className="text-neutral-500 text-sm space-y-1">
-                                    <li className="flex justify-between"><span>Mon-Fri</span> <span>10am - 8pm</span></li>
-                                    <li className="flex justify-between"><span>Saturday</span> <span>10am - 6pm</span></li>
-                                    <li className="flex justify-between"><span>Sunday</span> <span>Closed</span></li>
-                                </ul>
+                            <div className="md:col-span-2 h-[400px] rounded-2xl overflow-hidden shadow-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-100 relative">
+                                {vendor.mapUrl ? (
+                                    <iframe
+                                        src={vendor.mapUrl}
+                                        width="100%"
+                                        height="100%"
+                                        style={{ border: 0 }}
+                                        allowFullScreen
+                                        loading="lazy"
+                                        referrerPolicy="no-referrer-when-downgrade"
+                                    />
+                                ) : (
+                                    <InteractiveMap
+                                        items={[{
+                                            id: vendor.id,
+                                            lat: vendor.lat,
+                                            lng: vendor.lng,
+                                            name: vendor.name,
+                                            imageUrl: vendor.imageUrl,
+                                            category: vendor.category,
+                                            rating: vendor.rating,
+                                            address: vendor.address,
+                                            phone: vendor.phone || null,
+                                            type: 'business',
+                                            businessType: 'store',
+                                            services: products
+                                        }]}
+                                        center={vendor.lat && vendor.lng ? { lat: vendor.lat, lng: vendor.lng } : undefined}
+                                        zoom={15}
+                                    />
+                                )}
                             </div>
-                        </div>
-                        <div className="md:col-span-2 h-[400px] rounded-2xl overflow-hidden shadow-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-100">
-                            <InteractiveMap
-                                items={[{
-                                    id: vendor.id,
-                                    lat: vendor.lat,
-                                    lng: vendor.lng,
-                                    name: vendor.name,
-                                    imageUrl: vendor.imageUrl,
-                                    category: vendor.category,
-                                    rating: vendor.rating,
-                                    address: vendor.address,
-                                    phone: vendor.phone || null,
-                                    type: 'business',
-                                    businessType: 'store',
-                                    services: products
-                                }]}
-                                center={vendor.lat && vendor.lng ? { lat: vendor.lat, lng: vendor.lng } : undefined}
-                                zoom={15}
-                            />
                         </div>
                     </div>
                 </div>

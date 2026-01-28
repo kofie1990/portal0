@@ -72,7 +72,11 @@ export default function VendorsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredBusinesses.map((business, index) => (
-                            <Link href={`/business/service/${business.id}`} key={business.id} className="block group">
+                            <Link
+                                href={business.businessType === 'store' ? `/business/store/${business.id}` : `/business/service/${business.id}`}
+                                key={business.id}
+                                className="block group"
+                            >
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
