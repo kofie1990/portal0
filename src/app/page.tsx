@@ -53,7 +53,7 @@ export default function Home() {
           rating: b.rating || 0,
           reviews: b.review_count || 0,
           image: "bg-neutral-100",
-          imageUrl: b.image_url,
+          imageUrl: b.cover_image_url || b.image_url,
           coverImage: b.cover_image_url,
           lat: b.lat,
           lng: b.lng,

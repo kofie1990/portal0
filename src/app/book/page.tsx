@@ -4,7 +4,7 @@ import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, Calendar, Clock, Check, CreditCard, Info, ChevronRight, User } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Check, CreditCard, Info, ChevronRight, User, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/client";
@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 function BookingContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const vendorId = searchParams.get("vendorId");
+    const businessId = searchParams.get("businessId") || searchParams.get("vendorId");
     const serviceName = searchParams.get('service');
 
     // Fetch vendor from Supabase
@@ -21,14 +21,45 @@ function BookingContent() {
     const [loading, setLoading] = useState(true);
     const [pageError, setPageError] = useState<string | null>(null);
 
+    // Form State
+    const [step, setStep] = useState(1);
+    const [selectedService, setSelectedService] = useState<any>(null);
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedTime, setSelectedTime] = useState<string | null>(null);
+    const [processing, setProcessing] = useState(false);
+    const [userDetails, setUserDetails] = useState({ name: '', phone: '', email: '' });
+
+    // Fetch User Profile
+    useEffect(() => {
+        const fetchUserProfile = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single();
+
+                if (profile) {
+                    setUserDetails({
+                        name: profile.full_name || '',
+                        phone: profile.phone || '',
+                        email: profile.email || user.email || ''
+                    });
+                }
+            }
+        };
+        fetchUserProfile();
+    }, []);
+
     useEffect(() => {
         const fetchVendor = async () => {
-            if (!vendorId) return;
+            if (!businessId) return;
 
             const { data, error } = await supabase
                 .from('businesses')
                 .select('*, services(*)')
-                .eq('id', vendorId)
+                .eq('id', businessId)
                 .single();
 
             if (data && !error) {
@@ -45,23 +76,20 @@ function BookingContent() {
                     }))
                 });
             } else {
-                setPageError("Vendor not found");
+                setPageError("Business not found");
             }
             setLoading(false);
         };
         fetchVendor();
-    }, [vendorId]);
+    }, [businessId]);
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center">Loading Vendor...</div>;
+    if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-neutral-400" /></div>;
     if (pageError || !vendor) return <div className="min-h-screen flex items-center justify-center">{pageError || "Vendor not found"}</div>;
 
 
     const services = vendor.services || [];
 
-    const [step, setStep] = useState(1);
-    const [selectedService, setSelectedService] = useState<any>(null);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
 
     // Generate dates dynamically
     const getAvailableDates = () => {
@@ -83,45 +111,77 @@ function BookingContent() {
     const dates = getAvailableDates();
     const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
-    const [processing, setProcessing] = useState(false);
-    const [userDetails, setUserDetails] = useState({ name: '', phone: '', email: '' });
+
+
+
+
 
     const handlePayment = async () => {
         setProcessing(true);
         try {
+            // 1. Check Auth
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                // Determine login URL (could trigger a modal or redirect)
+                // For now, alert and redirect
+                alert("Please log in to book an appointment.");
+                window.location.href = `/login?redirect=/book?businessId=${vendor.id}&service=${encodeURIComponent(selectedService.name)}`;
+                return;
+            }
+
             // Calculate Amount (Deposit or Full)
             const amountToPay = vendor.depositFee > 0 ? vendor.depositFee : selectedService.amount;
 
+            // 2. Create Booking Record
+            const { data: bookingData, error: bookingError } = await supabase
+                .from('bookings')
+                .insert({
+                    user_id: user.id,
+                    business_id: vendor.id,
+                    service_id: selectedService.id,
+                    booking_date: new Date(`${selectedDate} ${selectedTime}`).toISOString(), // Naive Date Convert
+                    status: 'pending_payment',
+                    total_amount: selectedService.amount,
+                    amount_paid: 0,
+                    notes: `Booking for ${selectedService.name} on ${selectedDate} at ${selectedTime}`,
+                })
+                .select()
+                .single();
+
+            if (bookingError) throw bookingError;
+
+            // 3. Initialize Paystack
             const res = await fetch('/api/paystack/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: userDetails.email || 'guest@example.com', // Should collect email
+                    email: userDetails.email || user.email,
                     amount: amountToPay,
                     subaccount: vendor.paystack_subaccount_code,
                     metadata: {
-                        booking_data: {
-                            business_id: vendor.id,
-                            service_id: selectedService.id,
-                            date: selectedDate,
-                            time: selectedTime,
-                            customer_name: userDetails.name,
-                            customer_phone: userDetails.phone
-                        },
-                        vendorId: vendor.id
+                        booking_id: bookingData.id, // Important for callback
+                        vendorId: vendor.id,
+                        business_id: vendor.id,
+                        custom_fields: [
+                            {
+                                display_name: "Service",
+                                variable_name: "service",
+                                value: selectedService.name
+                            }
+                        ]
                     }
                 })
             });
             const data = await res.json();
-            if (data.authorization_url) {
+            if (res.ok && data.authorization_url) {
                 window.location.href = data.authorization_url;
             } else {
-                alert("Payment initialization failed");
+                alert(`Payment initialization failed: ${data.error || "Unknown error"}`);
                 setProcessing(false);
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert("An error occurred");
+            alert(`An error occurred: ${e.message}`);
             setProcessing(false);
         }
     };
@@ -211,8 +271,8 @@ function BookingContent() {
                                                 return (
                                                     <button
                                                         key={dateStr}
-                                                        onClick={() => setSelectedDate(d.date + " " + d.month)}
-                                                        className={`min-w-[80px] p-4 rounded-2xl flex flex-col items-center gap-1 border-2 transition-all flex-shrink-0 ${selectedDate === (d.date + " " + d.month)
+                                                        onClick={() => setSelectedDate(d.date + " " + d.month + " " + d.fullDate.getFullYear())}
+                                                        className={`min-w-[80px] p-4 rounded-2xl flex flex-col items-center gap-1 border-2 transition-all flex-shrink-0 ${selectedDate === (d.date + " " + d.month + " " + d.fullDate.getFullYear())
                                                             ? "border-black dark:border-white bg-black dark:bg-white text-white dark:text-black"
                                                             : "border-neutral-100 dark:border-neutral-800"
                                                             }`}
@@ -291,7 +351,8 @@ function BookingContent() {
                                             <input
                                                 className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white"
                                                 placeholder="John Doe"
-                                                defaultValue="John Doe"
+                                                value={userDetails.name}
+                                                onChange={(e) => setUserDetails({ ...userDetails, name: e.target.value })}
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -299,6 +360,8 @@ function BookingContent() {
                                             <input
                                                 className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white"
                                                 placeholder="+233 XX XXX XXX"
+                                                value={userDetails.phone}
+                                                onChange={(e) => setUserDetails({ ...userDetails, phone: e.target.value })}
                                             />
                                         </div>
                                     </div>

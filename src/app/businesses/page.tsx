@@ -26,7 +26,7 @@ export default function VendorsPage() {
                     rating: b.rating || 0,
                     reviews: b.review_count || 0,
                     image: "bg-neutral-100",
-                    imageUrl: b.image_url,
+                    imageUrl: b.image_url || b.cover_image_url,
                     address: b.location_address,
                     businessType: b.location_type === 'physical' ? 'store' : 'service',
                 }));

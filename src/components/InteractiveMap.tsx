@@ -74,6 +74,13 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [selectedItem, setSelectedItem] = useState<MapItem | null>(null);
 
+    // Update map center when prop changes (e.g. after geocoding)
+    useEffect(() => {
+        if (center) {
+            setMapCenter(center);
+        }
+    }, [center]);
+
     useEffect(() => {
         // Get User Location
         if (navigator.geolocation) {

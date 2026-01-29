@@ -22,6 +22,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
     const [vendor, setVendor] = useState<any>(null);
     const [products, setProducts] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [geocodedLocation, setGeocodedLocation] = useState<{ lat: number, lng: number } | null>(null);
 
     useEffect(() => {
         const fetchVendor = async () => {
@@ -72,6 +73,34 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
 
         if (id) fetchVendor();
     }, [id]);
+
+    useEffect(() => {
+        if (vendor && !vendor.lat && !vendor.lng && vendor.address && !vendor.mapUrl) {
+            // Geocode the address
+            const geocodeAddress = async () => {
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(vendor.address)}&limit=1`,
+                        {
+                            headers: {
+                                "User-Agent": "PortalApp/1.0"
+                            }
+                        }
+                    );
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        setGeocodedLocation({
+                            lat: parseFloat(data[0].lat),
+                            lng: parseFloat(data[0].lon)
+                        });
+                    }
+                } catch (error) {
+                    console.error("Geocoding failed:", error);
+                }
+            };
+            geocodeAddress();
+        }
+    }, [vendor]);
 
 
     if (isLoading) {
@@ -141,7 +170,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                 <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
                                     <Heart className="w-5 h-5" />
                                 </button>
-                                <Link href={`/book?vendorId=${vendor.id}&type=store`} className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
+                                <Link href={`/book?businessId=${vendor.id}&type=store`} className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
                                     BOOK APPOINTMENT
                                 </Link>
                             </div>
@@ -188,7 +217,7 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                             </motion.div>
                         )) : (
                             <div className="col-span-full py-12 text-center text-neutral-500 italic">
-                                No products listed yet.
+                                No Services listed yet.
                             </div>
                         )}
                     </div>
@@ -252,8 +281,8 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                     <InteractiveMap
                                         items={[{
                                             id: vendor.id,
-                                            lat: vendor.lat,
-                                            lng: vendor.lng,
+                                            lat: vendor.lat || geocodedLocation?.lat || 0,
+                                            lng: vendor.lng || geocodedLocation?.lng || 0,
                                             name: vendor.name,
                                             imageUrl: vendor.imageUrl,
                                             category: vendor.category,
@@ -264,7 +293,13 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                             businessType: 'store',
                                             services: products
                                         }]}
-                                        center={vendor.lat && vendor.lng ? { lat: vendor.lat, lng: vendor.lng } : undefined}
+                                        center={
+                                            (vendor.lat && vendor.lng)
+                                                ? { lat: vendor.lat, lng: vendor.lng }
+                                                : geocodedLocation
+                                                    ? { lat: geocodedLocation.lat, lng: geocodedLocation.lng }
+                                                    : undefined
+                                        }
                                         zoom={15}
                                     />
                                 )}

@@ -19,7 +19,7 @@ type Service = Database['public']['Tables']['services']['Row'] & {
     businesses: { name: string } | null
 };
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
-    services: { name: string; price_amount: number; price_currency: string } | null;
+    services: { name: string; price_amount: number; price_currency: string; image_url: string | null; images: string[] | null } | null;
     businesses: { name: string } | null;
     profiles: { full_name: string; avatar_url: string | null } | null;
 };
@@ -78,7 +78,7 @@ export default function AccountPage() {
                     .from('bookings')
                     .select(`
                         *,
-                        services (name, price_amount, price_currency),
+                        services (name, price_amount, price_currency, image_url, images),
                         businesses (name),
                         profiles:profiles!provider_id (full_name, avatar_url)
                     `)
@@ -95,7 +95,7 @@ export default function AccountPage() {
                     .from('bookings')
                     .select(`
                         *,
-                        services (name, price_amount, price_currency),
+                        services (name, price_amount, price_currency, image_url, images),
                         businesses (name),
                         profiles:profiles!provider_id (full_name, avatar_url)
                     `)
@@ -107,23 +107,22 @@ export default function AccountPage() {
                 const { data: bizData } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
                 const businessIds = bizData?.map(b => b.id) || [];
 
-                let providerQuery = supabase
-                    .from('bookings')
-                    .select(`
-                        *,
-                        services (name, price_amount, price_currency),
-                        businesses (name),
-                        profiles:profiles!user_id (full_name, avatar_url)
-                    `)
-                    .neq('status', 'cancelled');
+                let providerBookingsData: any[] = [];
 
                 if (businessIds.length > 0) {
-                    providerQuery = providerQuery.or(`provider_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
-                } else {
-                    providerQuery = providerQuery.eq('provider_id', user.id);
-                }
+                    const { data } = await supabase
+                        .from('bookings')
+                        .select(`
+                            *,
+                            services (name, price_amount, price_currency, image_url, images),
+                            businesses (name),
+                            profiles:profiles!user_id (full_name, avatar_url)
+                        `)
+                        .neq('status', 'cancelled')
+                        .in('business_id', businessIds);
 
-                const { data: providerBookingsData } = await providerQuery;
+                    if (data) providerBookingsData = data;
+                }
 
                 if (myBookingsData) setMyBookings(myBookingsData as any);
                 if (providerBookingsData) setProviderBookings(providerBookingsData as any);
@@ -139,26 +138,23 @@ export default function AccountPage() {
 
             // 2. Fetch Provider Notifications (Bookings for my services needing action)
             // Assuming 'pending_payment' or just created bookings are "new"
-            let providerQuery = supabase
-                .from('bookings')
-                .select(`
+            let providerData: any[] = [];
+
+            if (businessIds.length > 0) {
+                const { data } = await supabase
+                    .from('bookings')
+                    .select(`
                     *,
-                    services (name, price_amount, price_currency),
+                    services (name, price_amount, price_currency, image_url, images),
                     businesses (name),
                     profiles:profiles!user_id (full_name)
                 `)
-                .neq('status', 'cancelled'); // Get active ones
+                    .neq('status', 'cancelled') // Get active ones
+                    .in('business_id', businessIds);
 
-            if (businessIds.length > 0) {
-                providerQuery = providerQuery.or(`provider_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
-            } else {
-                providerQuery = providerQuery.eq('provider_id', user.id);
+                if (data) providerData = data;
             }
 
-            const { data: providerData } = await providerQuery;
-
-            // Filter locally for now for "Actionable" or "New"
-            // For now, let's show ALL pending/confirmed to the provider as "Inbox"
             const providerNotifications = providerData || [];
 
             // 3. Fetch Customer Notifications (Updates on my bookings)
@@ -167,7 +163,7 @@ export default function AccountPage() {
                 .from('bookings')
                 .select(`
                     *,
-                    services (name, price_amount, price_currency),
+                    services (name, price_amount, price_currency, image_url, images),
                     businesses (name),
                     profiles:profiles!provider_id (full_name)
                 `)
@@ -338,9 +334,9 @@ export default function AccountPage() {
                             {/* Sidebar */}
                             <div className="md:col-span-1 bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 h-fit">
                                 <div className="flex items-center gap-4 mb-8">
-                                    <div className="w-12 h-12 bg-neutral-200 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xl font-bold overflow-hidden">
+                                    <div className="w-12 h-12 bg-neutral-200 dark:bg-neutral-800 rounded-full flex items-center justify-center text-xl font-bold overflow-hidden relative">
                                         {profile?.avatar_url ? (
-                                            <Image src={profile.avatar_url} alt="Profile" width={48} height={48} className="object-cover w-full h-full" />
+                                            <Image src={profile.avatar_url} alt="Profile" fill className="object-cover" />
                                         ) : (
                                             user?.email?.[0].toUpperCase() || "U"
                                         )}
@@ -574,8 +570,8 @@ export default function AccountPage() {
                                                 {myBusinesses.map((business) => (
                                                     <div key={business.id} className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-6">
                                                         <div className="w-20 h-20 bg-neutral-200 rounded-xl relative overflow-hidden flex-shrink-0">
-                                                            {business.image_url ? (
-                                                                <Image src={business.image_url} alt={business.name} fill className="object-cover" />
+                                                            {business.image_url || business.cover_image_url ? (
+                                                                <Image src={business.image_url || business.cover_image_url || ''} alt={business.name} fill className="object-cover" />
                                                             ) : (
                                                                 <div className="w-full h-full flex items-center justify-center bg-neutral-100 dark:bg-neutral-900 text-2xl font-bold text-neutral-300">
                                                                     {business.name[0]}
@@ -589,15 +585,11 @@ export default function AccountPage() {
                                                             </div>
                                                             <p className="text-sm text-neutral-500 mb-3">{business.category} • {business.location_address}</p>
                                                             <div className="flex flex-wrap justify-center md:justify-start gap-2">
-                                                                <Link href={`/dashboard/${business.id}`}>
-                                                                    <button className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
-                                                                        <Settings className="w-3 h-3" /> Dashboard
-                                                                    </button>
+                                                                <Link href={`/dashboard/${business.id}`} className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
+                                                                    <Settings className="w-3 h-3" /> Dashboard
                                                                 </Link>
-                                                                <Link href={business.location_type === 'physical' ? `/business/store/${business.id}` : `/business/service/${business.id}`}>
-                                                                    <button className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
-                                                                        <ExternalLink className="w-3 h-3" /> View Live
-                                                                    </button>
+                                                                <Link href={business.location_type === 'physical' ? `/business/store/${business.id}` : `/business/service/${business.id}`} className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                                                                    <ExternalLink className="w-3 h-3" /> View Live
                                                                 </Link>
                                                             </div>
                                                         </div>
@@ -699,11 +691,11 @@ export default function AccountPage() {
                                                         <div className="flex items-start gap-4">
                                                             {/* Provider Avatar */}
                                                             <div className="flex-shrink-0">
-                                                                <div className="w-14 h-14 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 shadow-sm relative">
-                                                                    {booking.profiles?.avatar_url ? (
+                                                                <div className="w-14 h-14 bg-neutral-200 dark:bg-neutral-800 rounded-xl overflow-hidden border-2 border-white dark:border-neutral-900 shadow-sm relative">
+                                                                    {(booking.services?.image_url || booking.services?.images?.[0]) ? (
                                                                         <Image
-                                                                            src={booking.profiles.avatar_url}
-                                                                            alt={booking.profiles.full_name || "Provider"}
+                                                                            src={booking.services.image_url || booking.services.images![0]}
+                                                                            alt={booking.services.name}
                                                                             fill
                                                                             className="object-cover"
                                                                         />
@@ -759,12 +751,12 @@ export default function AccountPage() {
                                                                 <>
                                                                     <button
                                                                         onClick={() => handleCancelBooking(booking.id)}
-                                                                        className="px-4 py-2.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-900/30 transition-all"
+                                                                        className="w-full px-4 py-2.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-900/30 transition-all"
                                                                     >
                                                                         Cancel
                                                                     </button>
-                                                                    <Link href={`/account/bookings/${booking.id}`}>
-                                                                        <button className="px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">
+                                                                    <Link href={`/account/bookings/${booking.id}`} className="w-full">
+                                                                        <button className="w-full px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">
                                                                             View Details
                                                                         </button>
                                                                     </Link>
