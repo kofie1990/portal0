@@ -1,30 +1,28 @@
 "use client";
 
 import Navigation from "@/components/Navigation";
-import { useState, use } from "react";
-import { MOCK_BUSINESSES } from "@/lib/mock-data";
+import { useState, useEffect, use } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { notFound, useRouter } from "next/navigation";
-import { ArrowLeft, Save, Upload, MapPin, DollarSign, Store, Tag, Clock } from "lucide-react";
+import { ArrowLeft, Save, Upload, MapPin, DollarSign, Store, Tag, Clock, Loader2 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function EditBusinessPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
-    const vendor = MOCK_BUSINESSES.find((v) => v.id === id);
+    const supabase = createClient();
 
-    if (!vendor) {
-        notFound();
-    }
-
+    const [loading, setLoading] = useState(true);
     const [formData, setFormData] = useState({
-        name: vendor.name,
-        category: vendor.category,
-        bio: vendor.bio || "",
-        location: vendor.location,
-        address: vendor.address,
-        phone: vendor.phone,
-        email: vendor.email,
-        depositFee: vendor.depositFee || "",
+        name: "",
+        category: "",
+        bio: "",
+        location: "", // Check if this corresponds to location_type or similar in DB? assuming address or city
+        address: "", // location_address in DB likely
+        phone: "", // contact_phone?
+        email: "", // contact_email?
+        depositFee: "",
         website: "",
         instagram: "",
         twitter: "",
@@ -39,32 +37,118 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
             fri: { open: "09:00", close: "17:00", closed: false },
             sat: { open: "10:00", close: "15:00", closed: false },
             sun: { open: "10:00", close: "15:00", closed: true },
-        }
+        },
+        imageUrl: "",
+        coverImage: ""
     });
+
+    useEffect(() => {
+        const fetchBusiness = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('businesses')
+                .select('*')
+                .eq('id', id)
+                .single();
+
+            if (error || !data) {
+                console.error("Error fetching business:", error);
+                setLoading(false);
+                // notFound(); // Handle gracefully or redirect
+                return;
+            }
+
+            // Map DB columns to form state
+            // Note: Adjust column names based on your actual schema. I'm inferring from common patterns and existing code.
+            setFormData({
+                name: data.name || "",
+                category: data.category || "",
+                bio: data.description || "", // 'description' is common for bio
+                location: data.location_city || "", // 'location_city' 
+                address: data.location_address || "",
+                phone: data.contact_phone || "",
+                email: data.contact_email || "",
+                depositFee: data.deposit_amount ? data.deposit_amount.toString() : "",
+                website: data.website_url || "",
+                instagram: data.social_instagram || "",
+                twitter: data.social_twitter || "",
+                acceptCash: data.accepted_payment_methods?.includes('cash') || false,
+                acceptMobileMoney: data.accepted_payment_methods?.includes('momo') || false,
+                autoConfirm: data.settings?.auto_confirm || false,
+                hours: data.operating_hours || {
+                    mon: { open: "09:00", close: "17:00", closed: false },
+                    tue: { open: "09:00", close: "17:00", closed: false },
+                    wed: { open: "09:00", close: "17:00", closed: false },
+                    thu: { open: "09:00", close: "17:00", closed: false },
+                    fri: { open: "09:00", close: "17:00", closed: false },
+                    sat: { open: "10:00", close: "15:00", closed: false },
+                    sun: { open: "10:00", close: "15:00", closed: true },
+                },
+                imageUrl: data.image_url || "",
+                coverImage: data.cover_image_url || ""
+            });
+            setLoading(false);
+        };
+
+        fetchBusiness();
+    }, [id, supabase]);
 
     const handleHourChange = (day: string, field: string, value: any) => {
         setFormData(prev => ({
             ...prev,
             hours: {
                 ...prev.hours,
-                [day]: { ...prev.hours[day as keyof typeof prev.hours], [field]: value }
+                [day]: { ...(prev.hours as any)[day], [field]: value }
             }
         }));
     };
 
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
 
-        // Simulate API call
-        setTimeout(() => {
+        const paymentMethods = [];
+        if (formData.acceptCash) paymentMethods.push('cash');
+        if (formData.acceptMobileMoney) paymentMethods.push('momo');
+
+        const updates = {
+            name: formData.name,
+            category: formData.category,
+            description: formData.bio,
+            location_address: formData.address,
+            contact_phone: formData.phone,
+            contact_email: formData.email,
+            deposit_amount: formData.depositFee ? parseFloat(formData.depositFee) : 0,
+            website_url: formData.website,
+            social_instagram: formData.instagram,
+            social_twitter: formData.twitter,
+            accepted_payment_methods: paymentMethods,
+            settings: { auto_confirm: formData.autoConfirm },
+            operating_hours: formData.hours,
+            updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+            .from('businesses')
+            .update(updates)
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error saving business:", error);
+            alert("Error saving changes. Please try again.");
+            setIsSaving(false);
+        } else {
             setIsSaving(false);
             alert("Changes saved successfully!");
             router.push(`/dashboard/${id}`);
-        }, 1000);
+        }
     };
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-neutral-400" /></div>;
+    }
 
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
@@ -74,23 +158,21 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
 
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
-                    <button
-                        onClick={() => router.back()}
-                        className="flex items-center gap-2 text-neutral-500 hover:text-black dark:hover:text-white transition-colors"
-                    >
+                    <Link href={`/dashboard/${id}`} className="flex items-center gap-2 text-neutral-500 hover:text-black dark:hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-                    </button>
+                    </Link>
                     <h1 className="text-xl font-bold">Edit Business Profile</h1>
                 </div>
 
                 <form onSubmit={handleSave} className="space-y-8">
 
-                    {/* Cover & Profile Image Section */}
+                    {/* Cover & Profile Image Section (Read Only for now or need uploder) */}
+                    {/* Note: Ideally we'd implement image upload here, but focusing on data binding first as per request */}
                     <div className="relative group cursor-pointer">
                         <div className="w-full h-48 bg-neutral-200 dark:bg-neutral-800 rounded-2xl overflow-hidden relative">
-                            {vendor.coverImage && (
+                            {formData.coverImage && (
                                 <Image
-                                    src={vendor.coverImage}
+                                    src={formData.coverImage}
                                     alt="Cover"
                                     fill
                                     className="object-cover opacity-50 group-hover:opacity-40 transition-opacity"
@@ -98,16 +180,16 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
                             )}
                             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <div className="bg-black/50 text-white px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2">
-                                    <Upload className="w-4 h-4" /> Change Cover
+                                    <Upload className="w-4 h-4" /> Change Cover (Coming Soon)
                                 </div>
                             </div>
                         </div>
 
                         <div className="absolute -bottom-12 left-8">
                             <div className="w-24 h-24 rounded-full border-4 border-white dark:border-black bg-neutral-300 dark:bg-neutral-700 relative overflow-hidden group/profile cursor-pointer">
-                                {vendor.imageUrl && (
+                                {formData.imageUrl && (
                                     <Image
-                                        src={vendor.imageUrl}
+                                        src={formData.imageUrl}
                                         alt="Profile"
                                         fill
                                         className="object-cover"
@@ -249,7 +331,7 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
                                 </h2>
 
                                 <div className="space-y-4">
-                                    {Object.entries(formData.hours).map(([day, schedule]) => (
+                                    {Object.entries(formData.hours).map(([day, schedule]: [string, any]) => (
                                         <div key={day} className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-900 pb-4 last:border-0 last:pb-0">
                                             <div className="w-24 font-bold uppercase text-sm">{day}</div>
                                             <div className="flex items-center gap-4">

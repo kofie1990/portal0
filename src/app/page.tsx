@@ -25,6 +25,7 @@ export default function Home() {
   const [category, setCategory] = useState("All");
   const [isSearching, setIsSearching] = useState(false);
   const [businesses, setBusinesses] = useState<any[]>([]);
+  const [geocodedCoords, setGeocodedCoords] = useState<Record<string, { lat: number, lng: number }>>({});
 
   // Fetch real data
 
@@ -136,7 +137,7 @@ export default function Home() {
 
     const matchesQuery =
       business.name.toLowerCase().includes(query.toLowerCase()) ||
-      (business.bio && business.bio.toLowerCase().includes(query.toLowerCase())) || // Added Bio Filtering
+      (business.bio && business.bio.toLowerCase().includes(query.toLowerCase())) ||
       (business.address && business.address.toLowerCase().includes(query.toLowerCase())) ||
       (business.location && business.location.toLowerCase().includes(query.toLowerCase())) ||
       (business.items && business.items.some((item: string) => item.toLowerCase().includes(query.toLowerCase()))) ||
@@ -145,8 +146,51 @@ export default function Home() {
         svc.description?.toLowerCase().includes(query.toLowerCase())
       ));
 
+
+
     return matchesCategory && matchesQuery;
   });
+
+  // Geocode filtered businesses that are missing coordinates
+  useEffect(() => {
+    const businessesToGeocode = filteredBusinesses.filter(
+      b => (!b.lat || !b.lng) && b.address && !geocodedCoords[b.id]
+    );
+
+    if (businessesToGeocode.length > 0) {
+      // Throttle/Sequence requests to avoid rate limits
+      const geocodeNext = async (index: number) => {
+        if (index >= businessesToGeocode.length) return;
+
+        const business = businessesToGeocode[index];
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(business.address)}&limit=1`,
+            {
+              headers: { "User-Agent": "PortalApp/1.0" }
+            }
+          );
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setGeocodedCoords(prev => ({
+              ...prev,
+              [business.id]: {
+                lat: parseFloat(data[0].lat),
+                lng: parseFloat(data[0].lon)
+              }
+            }));
+          }
+        } catch (e) {
+          console.error("Geocoding failed for", business.name, e);
+        }
+
+        // Wait 1s between requests to be nice to Nominatim
+        setTimeout(() => geocodeNext(index + 1), 1000);
+      };
+
+      geocodeNext(0);
+    }
+  }, [filteredBusinesses, geocodedCoords]);
 
   const handleSearch = () => {
     if (query.trim().length > 0) {
@@ -202,7 +246,17 @@ export default function Home() {
             }`}
         >
           <div className="w-full h-full">
-            <InteractiveMap items={filteredBusinesses.filter(b => b.lat && b.lng)} />
+            <InteractiveMap items={filteredBusinesses.map(b => {
+              if (b.lat && b.lng) return b;
+              if (geocodedCoords[b.id]) {
+                return {
+                  ...b,
+                  lat: geocodedCoords[b.id].lat,
+                  lng: geocodedCoords[b.id].lng
+                };
+              }
+              return null;
+            }).filter(Boolean)} />
           </div>
 
           {/* Overlay to close search mode (Optional UX enhancement) */}

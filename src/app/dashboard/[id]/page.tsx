@@ -253,18 +253,22 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                             <div className="space-y-3">
                                 <Link href={`/business/edit/${vendor.id}`}>
                                     <button className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-sm font-medium">
-                                        <span>Edit Profile</span>
+                                        <span>Edit Business</span>
                                         <ArrowUpRight className="w-4 h-4 text-neutral-400" />
                                     </button>
                                 </Link>
-                                <button className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-sm font-medium">
-                                    <span>Manage Services</span>
-                                    <ArrowUpRight className="w-4 h-4 text-neutral-400" />
-                                </button>
-                                <button className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-sm font-medium">
-                                    <span>Settings</span>
-                                    <ArrowUpRight className="w-4 h-4 text-neutral-400" />
-                                </button>
+                                <Link href={`/dashboard/${vendor.id}/services`}>
+                                    <button className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-sm font-medium">
+                                        <span>Manage Services</span>
+                                        <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+                                    </button>
+                                </Link>
+                                <Link href={`/business/edit/${vendor.id}`}>
+                                    <button className="w-full flex items-center justify-between p-3 rounded-xl bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-sm font-medium">
+                                        <span>Settings</span>
+                                        <ArrowUpRight className="w-4 h-4 text-neutral-400" />
+                                    </button>
+                                </Link>
                             </div>
                         </div>
 
