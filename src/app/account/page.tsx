@@ -12,7 +12,9 @@ import { Database } from "@/types/supabase";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import NotificationsSheet from "@/components/NotificationsSheet";
 import CalendarView from "@/components/CalendarView";
+
 import { confirmBooking } from "@/app/actions/booking";
+import FileUpload from "@/components/ui/FileUpload";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
 type Service = Database['public']['Tables']['services']['Row'] & {
@@ -191,18 +193,34 @@ export default function AccountPage() {
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
         const fullName = formData.get("fullName") as string;
+        const phone = formData.get("phone") as string;
+        const bio = formData.get("bio") as string;
+        const interestsStr = formData.get("interests") as string;
+
+        // Convert comma-separated interests to array
+        const interests = interestsStr ? interestsStr.split(',').map(i => i.trim()).filter(i => i.length > 0) : [];
 
         // Optimistic update
-        setProfile((prev: any) => ({ ...prev, full_name: fullName }));
+        setProfile((prev: any) => ({
+            ...prev,
+            full_name: fullName,
+            phone,
+            bio,
+            interests
+        }));
         setIsEditingProfile(false);
 
         const { error } = await supabase
             .from('profiles')
             .update({
                 full_name: fullName,
+                phone,
+                bio,
+                interests,
                 location_text: profile.location_text,
                 lat: profile.lat,
-                lng: profile.lng
+                lng: profile.lng,
+                avatar_url: profile.avatar_url // Ensure avatar_url is persisted from state
             })
             .eq('id', user.id);
 
@@ -386,17 +404,15 @@ export default function AccountPage() {
                                                 <form onSubmit={handleUpdateProfile} className="space-y-6">
                                                     {/* Profile Update Form */}
                                                     <div className="flex flex-col items-center mb-8">
-                                                        <div className="w-24 h-24 bg-neutral-100 dark:bg-neutral-900 rounded-full flex items-center justify-center relative group cursor-pointer overflow-hidden">
-                                                            {profile?.avatar_url ? (
-                                                                <Image src={profile.avatar_url} alt="Profile" fill className="object-cover" />
-                                                            ) : (
-                                                                <span className="text-2xl font-bold text-neutral-400">{user?.email?.[0].toUpperCase()}</span>
-                                                            )}
-                                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50">
-                                                                <Camera className="w-6 h-6 text-white" />
-                                                            </div>
+                                                        <div className="w-40">
+                                                            <FileUpload
+                                                                label="Profile Photo"
+                                                                value={profile?.avatar_url || ""}
+                                                                onChange={(url) => setProfile((prev: any) => ({ ...prev, avatar_url: url }))}
+                                                                bucket="avatars"
+                                                                className="w-full"
+                                                            />
                                                         </div>
-                                                        <button className="mt-3 text-sm font-bold text-blue-600 hover:underline">Change Photo</button>
                                                     </div>
 
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -416,6 +432,37 @@ export default function AccountPage() {
                                                                 disabled
                                                                 defaultValue={user?.email || ""}
                                                                 className="w-full bg-neutral-100 dark:bg-neutral-800 border-none text-neutral-500 rounded-xl px-4 py-3 cursor-not-allowed"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-sm font-bold text-neutral-500 uppercase tracking-wider">Phone</label>
+                                                            <input
+                                                                type="tel"
+                                                                name="phone"
+                                                                defaultValue={profile?.phone || ""}
+                                                                placeholder="+233 XX XXX XXXX"
+                                                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className="text-sm font-bold text-neutral-500 uppercase tracking-wider">Interests</label>
+                                                            <input
+                                                                type="text"
+                                                                name="interests"
+                                                                defaultValue={profile?.interests?.join(", ") || ""}
+                                                                placeholder="Cooking, Coding, Music..."
+                                                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                                            />
+                                                            <p className="text-xs text-neutral-400">Comma separated values</p>
+                                                        </div>
+                                                        <div className="space-y-2 col-span-1 md:col-span-2">
+                                                            <label className="text-sm font-bold text-neutral-500 uppercase tracking-wider">Bio</label>
+                                                            <textarea
+                                                                name="bio"
+                                                                rows={3}
+                                                                defaultValue={profile?.bio || ""}
+                                                                placeholder="Tell us a little about yourself..."
+                                                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 outline-none focus:border-black dark:focus:border-white transition-colors resize-none"
                                                             />
                                                         </div>
                                                         <div className="space-y-2 col-span-1 md:col-span-2">

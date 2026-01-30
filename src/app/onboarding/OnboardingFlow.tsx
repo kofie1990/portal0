@@ -31,7 +31,7 @@ export default function OnboardingFlow() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Form State
-    const [location, setLocation] = useState("Accra, Ghana");
+    const [location, setLocation] = useState("");
     const [lat, setLat] = useState<number | null>(null);
     const [lng, setLng] = useState<number | null>(null);
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);

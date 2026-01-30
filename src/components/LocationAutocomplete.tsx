@@ -38,14 +38,18 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
 
     // Click outside to close
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        const handleClickOutside = (event: MouseEvent | TouchEvent) => {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
 
         document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        document.addEventListener("touchstart", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("touchstart", handleClickOutside);
+        };
     }, []);
 
     const searchLocation = async (searchQuery: string) => {
@@ -98,7 +102,9 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
         setIsOpen(false);
     };
 
-    const handleUseCurrentLocation = () => {
+    const handleUseCurrentLocation = (e?: React.MouseEvent) => {
+        e?.preventDefault(); // Prevent any form submission or default behavior
+
         if ("geolocation" in navigator) {
             setIsLoading(true);
             navigator.geolocation.getCurrentPosition(async (position) => {
@@ -172,8 +178,10 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
                     >
                         <div className="p-2">
                             <button
+                                type="button"
                                 onClick={handleUseCurrentLocation}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 rounded-lg transition-colors text-left"
+                                onMouseDown={(e) => e.preventDefault()}
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 active:bg-neutral-100 dark:active:bg-neutral-700 rounded-lg transition-colors text-left"
                             >
                                 <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400">
                                     <MapPin className="w-4 h-4" />
@@ -188,9 +196,11 @@ export default function LocationAutocomplete({ onSelect, initialValue = "", plac
 
                             {results.map((item) => (
                                 <button
+                                    type="button"
                                     key={item.place_id}
                                     onClick={() => handleSelect(item)}
-                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 rounded-lg transition-colors text-left"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 active:bg-neutral-100 dark:active:bg-neutral-700 rounded-lg transition-colors text-left"
                                 >
                                     <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-500">
                                         <MapPin className="w-4 h-4" />
