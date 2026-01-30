@@ -32,6 +32,7 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
     const [deposit, setDeposit] = useState(""); // Added
     const [description, setDescription] = useState("");
     const [category, setCategory] = useState("");
+    const [maxBookings, setMaxBookings] = useState("1"); // Added
     const [location, setLocation] = useState("");
     const [lat, setLat] = useState<number | null>(null);
     const [lng, setLng] = useState<number | null>(null);
@@ -64,6 +65,7 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                 setName(serviceData.name);
                 setPrice(serviceData.price_amount.toString());
                 setDeposit(serviceData.deposit_amount ? serviceData.deposit_amount.toString() : ""); // Added
+                setMaxBookings(serviceData.max_bookings_per_slot ? serviceData.max_bookings_per_slot.toString() : "1"); // Added
                 setDescription(serviceData.description || "");
                 setCategory(serviceData.category || "");
                 setLocation(serviceData.location_text || (serviceData.businesses?.name ? "Business Location" : "")); // Handle location logic
@@ -291,6 +293,7 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                     name,
                     price_amount: parseFloat(price),
                     deposit_amount: deposit ? parseFloat(deposit) : 0, // Added
+                    max_bookings_per_slot: parseInt(maxBookings) || 1, // Added
                     description,
                     category,
                     location_text: service?.profile_id ? location : undefined,
@@ -456,6 +459,18 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                                                 {/* Add more categories as needed */}
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider ml-1">Max Bookings Per Slot</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={maxBookings}
+                                            onChange={(e) => setMaxBookings(e.target.value)}
+                                            className="w-full bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 ring-black dark:ring-white transition-all"
+                                            placeholder="1"
+                                        />
                                     </div>
 
                                     <div className="space-y-2">

@@ -271,6 +271,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                     email: data.email,
                     password: data.password,
                     options: {
+                        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
                         data: {
                             full_name: data.businessName,
                             role: 'business',

@@ -33,6 +33,7 @@ export default function ListPage() {
     const [serviceName, setServiceName] = useState("");
     const [price, setPrice] = useState("");
     const [deposit, setDeposit] = useState(""); // Added
+    const [maxBookings, setMaxBookings] = useState("1"); // Added: Booking Capacity
     const [description, setDescription] = useState("");
 
     // Image Upload State
@@ -190,6 +191,7 @@ export default function ListPage() {
                         name: serviceName,
                         price_amount: parseFloat(price.replace(/[^0-9.]/g, '')),
                         deposit_amount: deposit ? parseFloat(deposit.replace(/[^0-9.]/g, '')) : 0, // Added
+                        max_bookings_per_slot: parseInt(maxBookings) || 1, // Added
                         description: description,
                         category: category || "Uncategorized",
                         location_text: location,
@@ -210,6 +212,7 @@ export default function ListPage() {
                         name: serviceName,
                         price_amount: parseFloat(price.replace(/[^0-9.]/g, '')),
                         deposit_amount: deposit ? parseFloat(deposit.replace(/[^0-9.]/g, '')) : 0, // Added
+                        max_bookings_per_slot: parseInt(maxBookings) || 1, // Added
                         description: description,
                         category: category || "Uncategorized",
                         image_url: imageUrls[0] || null,
@@ -313,6 +316,19 @@ export default function ListPage() {
                                     />
                                     <p className="text-xs text-neutral-400 ml-1">Client pays this to confirm.</p>
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold tracking-wide ml-1">MAX BOOKINGS PER SLOT</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={maxBookings}
+                                    onChange={(e) => setMaxBookings(e.target.value)}
+                                    placeholder="1"
+                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                />
+                                <p className="text-xs text-neutral-400 ml-1">Number of clients that can book the same time slot.</p>
                             </div>
 
                             <div className="space-y-2">

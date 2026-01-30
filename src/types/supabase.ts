@@ -152,6 +152,7 @@ export interface Database {
                     images: string[] | null
                     location_text: string | null
                     deposit_amount: number | null // Added
+                    max_bookings_per_slot: number // Added
                 }
                 Insert: {
                     id?: string
@@ -171,6 +172,7 @@ export interface Database {
                     lng?: number | null
                     location_text?: string | null
                     deposit_amount?: number | null // Added
+                    max_bookings_per_slot?: number // Added
                 }
                 Update: {
                     id?: string
@@ -190,6 +192,7 @@ export interface Database {
                     lng?: number | null
                     location_text?: string | null
                     deposit_amount?: number | null // Added
+                    max_bookings_per_slot?: number // Added
                 }
             }
             bookings: {

@@ -22,7 +22,8 @@ function ForgotPasswordContent() {
 
         // Construct the URL for the password reset flow
         // The callback route will handle the 'next' parameter
-        const redirectTo = `${window.location.origin}/auth/callback?next=/account/update-password`;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        const redirectTo = `${appUrl}/auth/callback?next=/account/update-password`;
 
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo,

@@ -29,6 +29,55 @@ function BookingContent() {
     const [processing, setProcessing] = useState(false);
     const [userDetails, setUserDetails] = useState({ name: '', phone: '', email: '' });
 
+    // Calendar Utility
+    const getAvailableDates = () => {
+        const today = new Date();
+        const outputDates = [];
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            outputDates.push({
+                fullDate: d,
+                day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+                date: d.getDate().toString(),
+                month: d.toLocaleDateString('en-US', { month: 'short' })
+            });
+        }
+        return outputDates;
+    };
+
+    const dates = getAvailableDates();
+    const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+
+    // Booking Capacity Logic
+    const [existingBookings, setExistingBookings] = useState<any[]>([]);
+
+    // Fetch Bookings Effect
+    useEffect(() => {
+        const fetchBookings = async () => {
+            if (!businessId || !vendor) return;
+
+            const startDate = dates[0].fullDate.toISOString();
+            const endDate = dates[dates.length - 1].fullDate.toISOString();
+
+            const { data } = await supabase
+                .from('bookings')
+                .select('booking_date, service_id, status')
+                .eq('business_id', businessId)
+                .in('status', ['pending_payment', 'confirmed'])
+                .gte('booking_date', startDate)
+                .lte('booking_date', endDate);
+
+            if (data) {
+                setExistingBookings(data);
+            }
+        };
+
+        if (vendor) {
+            fetchBookings();
+        }
+    }, [businessId, vendor, supabase]);
+
     // Fetch User Profile
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -72,7 +121,8 @@ function BookingContent() {
                         name: s.name,
                         price: `${s.price_currency || 'GH₵'} ${s.price_amount}`,
                         amount: s.price_amount, // Store raw amount for calc
-                        duration: s.duration_text
+                        duration: s.duration_text,
+                        max_bookings_per_slot: s.max_bookings_per_slot // Added
                     }))
                 });
             } else {
@@ -89,27 +139,29 @@ function BookingContent() {
 
     const services = vendor.services || [];
 
+    const getSlotInfo = (dateStr: string, time: string) => {
+        if (!selectedService) return { available: true, count: 0, max: 1 };
 
+        const slotDate = new Date(`${dateStr} ${time}`);
 
-    // Generate dates dynamically
-    const getAvailableDates = () => {
-        const today = new Date();
-        const outputDates = [];
-        for (let i = 0; i < 14; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() + i);
-            outputDates.push({
-                fullDate: d,
-                day: d.toLocaleDateString('en-US', { weekday: 'short' }),
-                date: d.getDate().toString(),
-                month: d.toLocaleDateString('en-US', { month: 'short' })
-            });
-        }
-        return outputDates;
+        const slotBookings = existingBookings.filter(b => {
+            if (b.service_id !== selectedService.id) return false;
+
+            const bDate = new Date(b.booking_date);
+            return bDate.getFullYear() === slotDate.getFullYear() &&
+                bDate.getMonth() === slotDate.getMonth() &&
+                bDate.getDate() === slotDate.getDate() &&
+                bDate.getHours() === slotDate.getHours() &&
+                bDate.getMinutes() === slotDate.getMinutes();
+        });
+
+        const limit = selectedService.max_bookings_per_slot || 1;
+        return {
+            available: slotBookings.length < limit,
+            count: slotBookings.length,
+            max: limit
+        };
     };
-
-    const dates = getAvailableDates();
-    const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
 
 
@@ -289,18 +341,31 @@ function BookingContent() {
                                     <div>
                                         <h2 className="text-xl font-bold mb-4">Select Time</h2>
                                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                                            {times.map((t) => (
-                                                <button
-                                                    key={t}
-                                                    onClick={() => setSelectedTime(t)}
-                                                    className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${selectedTime === t
-                                                        ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
-                                                        : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
-                                                        }`}
-                                                >
-                                                    {t}
-                                                </button>
-                                            ))}
+                                            {times.map((t) => {
+                                                const slotInfo = selectedDate ? getSlotInfo(selectedDate, t) : { available: true, count: 0, max: 1 };
+                                                const isAvailable = slotInfo.available;
+
+                                                return (
+                                                    <button
+                                                        key={t}
+                                                        disabled={!isAvailable}
+                                                        onClick={() => setSelectedTime(t)}
+                                                        className={`py-3 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${selectedTime === t
+                                                            ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
+                                                            : !isAvailable
+                                                                ? "border-neutral-100 dark:border-neutral-800 text-neutral-300 dark:text-neutral-700 cursor-not-allowed decoration-slice bg-neutral-50 dark:bg-neutral-900/50"
+                                                                : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                                            }`}
+                                                    >
+                                                        <span>{t}</span>
+                                                        {selectedDate && (
+                                                            <span className={`text-[10px] font-normal ${!isAvailable ? 'text-red-400' : 'text-neutral-400'}`}>
+                                                                {!isAvailable ? "Full" : `${slotInfo.count}/${slotInfo.max} Booked`}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 </motion.div>

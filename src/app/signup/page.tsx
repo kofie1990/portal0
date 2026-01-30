@@ -33,7 +33,7 @@ export default function SignupPage() {
             email,
             password,
             options: {
-                emailRedirectTo: `${location.origin}/auth/callback`,
+                emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || location.origin}/auth/callback`,
                 data: {
                     full_name: fullName,
                     phone: phone,

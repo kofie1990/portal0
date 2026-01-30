@@ -18,7 +18,32 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
     const [isLoading, setIsLoading] = useState(true);
     const [isBooking, setIsBooking] = useState(false);
     const [service, setService] = useState<any>(null);
-    const [bookingDate, setBookingDate] = useState("");
+    // REMOVED: const [bookingDate, setBookingDate] = useState(""); 
+
+    // New State for Custom Picker
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedTime, setSelectedTime] = useState<string | null>(null);
+    const [existingBookings, setExistingBookings] = useState<any[]>([]);
+
+    // Helper: Generate Dates
+    const getAvailableDates = () => {
+        const today = new Date();
+        const outputDates = [];
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() + i);
+            outputDates.push({
+                fullDate: d,
+                day: d.toLocaleDateString('en-US', { weekday: 'short' }),
+                date: d.getDate().toString(),
+                month: d.toLocaleDateString('en-US', { month: 'short' })
+            });
+        }
+        return outputDates;
+    };
+
+    const dates = getAvailableDates();
+    const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
     useEffect(() => {
         const fetchService = async () => {
@@ -40,8 +65,53 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
         fetchService();
     }, [id, supabase, router, showToast]);
 
+    // Fetch Bookings for Capacity
+    useEffect(() => {
+        const fetchBookings = async () => {
+            if (!service) return;
+
+            const startDate = dates[0].fullDate.toISOString();
+            const endDate = dates[dates.length - 1].fullDate.toISOString();
+
+            const { data } = await supabase
+                .from('bookings')
+                .select('booking_date, service_id, status')
+                .eq('service_id', service.id) // Filter by service directly here
+                .in('status', ['pending_payment', 'confirmed'])
+                .gte('booking_date', startDate)
+                .lte('booking_date', endDate);
+
+            if (data) {
+                setExistingBookings(data);
+            }
+        };
+        if (service) fetchBookings();
+    }, [service, supabase]);
+
+    const getSlotInfo = (dateStr: string, time: string) => {
+        if (!service) return { available: true, count: 0, max: 1 };
+
+        const slotDate = new Date(`${dateStr} ${time}`);
+
+        const slotBookings = existingBookings.filter(b => {
+            const bDate = new Date(b.booking_date);
+            return bDate.getFullYear() === slotDate.getFullYear() &&
+                bDate.getMonth() === slotDate.getMonth() &&
+                bDate.getDate() === slotDate.getDate() &&
+                bDate.getHours() === slotDate.getHours() &&
+                bDate.getMinutes() === slotDate.getMinutes();
+        });
+
+        const limit = service.max_bookings_per_slot || 1;
+        return {
+            available: slotBookings.length < limit,
+            count: slotBookings.length,
+            max: limit
+        };
+    };
+
     const handleBooking = async () => {
-        if (!bookingDate) {
+        if (!selectedDate || !selectedTime) {
             showToast("Please select a date and time.", "error");
             return;
         }
@@ -58,6 +128,30 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
             const deposit = service.deposit_amount || 0;
             const total = service.price_amount;
 
+            // 0. Check Capacity
+            const bookingISO = new Date(`${selectedDate} ${selectedTime}`).toISOString();
+            const { count, error: countError } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('service_id', service.id)
+                .eq('booking_date', bookingISO)
+                .in('status', ['pending_payment', 'confirmed']);
+
+            if (countError) {
+                console.error("Capacity check failed", countError);
+                // Proceed with caution or fail? Let's fail safe.
+                showToast("Could not verify availability. Please try again.", "error");
+                setIsBooking(false);
+                return;
+            }
+
+            const limit = service.max_bookings_per_slot || 1;
+            if (count !== null && count >= limit) {
+                showToast(`This time slot is fully booked (Max ${limit}). Please choose another time.`, "error");
+                setIsBooking(false);
+                return;
+            }
+
             // 1. Create Booking (Pending Payment)
             const { data: bookingData, error: bookingError } = await supabase
                 .from('bookings')
@@ -66,7 +160,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                     service_id: service.id,
                     business_id: service.business_id,
                     provider_id: service.profile_id,
-                    booking_date: new Date(bookingDate).toISOString(),
+                    booking_date: bookingISO,
                     status: 'pending_payment',
                     total_amount: total,
                     amount_paid: 0,
@@ -179,14 +273,63 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                             <h2 className="font-heading text-xl font-bold mb-6">Confirm Booking</h2>
 
                             <div className="space-y-6">
-                                {/* Date Picker Mock */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold ml-1">Select Date & Time</label>
-                                    <input
-                                        type="datetime-local"
-                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-black dark:ring-white transition-all"
-                                        onChange={(e) => setBookingDate(e.target.value)}
-                                    />
+                                {/* Date & Time Selection */}
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-sm font-bold ml-1 mb-3 block">SELECT DATE</label>
+                                        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide">
+                                            {dates.map((d) => {
+                                                const dateStr = d.fullDate.toDateString();
+                                                const isSelected = selectedDate === (d.date + " " + d.month + " " + d.fullDate.getFullYear());
+                                                return (
+                                                    <button
+                                                        key={dateStr}
+                                                        onClick={() => setSelectedDate(d.date + " " + d.month + " " + d.fullDate.getFullYear())}
+                                                        className={`min-w-[70px] p-3 rounded-2xl flex flex-col items-center gap-1 border-2 transition-all flex-shrink-0 ${isSelected
+                                                            ? "border-black dark:border-white bg-black dark:bg-white text-white dark:text-black"
+                                                            : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                                            }`}
+                                                    >
+                                                        <span className="text-[10px] font-bold uppercase opacity-70">{d.month}</span>
+                                                        <span className="text-lg font-bold">{d.date}</span>
+                                                        <span className="text-[10px] font-bold uppercase">{d.day}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-sm font-bold ml-1 mb-3 block">SELECT TIME</label>
+                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                            {times.map((t) => {
+                                                const slotInfo = selectedDate ? getSlotInfo(selectedDate, t) : { available: true, count: 0, max: 1 };
+                                                const isAvailable = slotInfo.available;
+                                                const isSelected = selectedTime === t;
+
+                                                return (
+                                                    <button
+                                                        key={t}
+                                                        disabled={!isAvailable}
+                                                        onClick={() => setSelectedTime(t)}
+                                                        className={`py-2 rounded-xl text-xs font-bold border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                                            ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
+                                                            : !isAvailable
+                                                                ? "border-neutral-100 dark:border-neutral-800 text-neutral-300 dark:text-neutral-700 cursor-not-allowed bg-neutral-50 dark:bg-neutral-900/50"
+                                                                : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                                            }`}
+                                                    >
+                                                        <span>{t}</span>
+                                                        {selectedDate && (
+                                                            <span className={`text-[9px] font-normal ${!isAvailable ? 'text-red-400' : 'text-neutral-400'}`}>
+                                                                {!isAvailable ? "Full" : `${slotInfo.count}/${slotInfo.max} Booked`}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Price Breakdown */}

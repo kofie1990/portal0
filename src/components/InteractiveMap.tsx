@@ -271,7 +271,7 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
                         {selectedItem.services && selectedItem.services.map((service, idx) => (
                             <Link
                                 key={idx}
-                                href={selectedItem.type === 'business' ? `/business/service/${selectedItem.id}` : `/service/${service.id}`}
+                                href={`/service/${service.id}`}
                                 className="min-w-[240px] max-w-[240px] bg-white rounded-2xl shadow-lg border border-neutral-100 overflow-hidden snap-center flex-shrink-0 group hover:ring-2 ring-black transition-all"
                             >
                                 <div className="h-32 w-full bg-neutral-100 relative overflow-hidden">

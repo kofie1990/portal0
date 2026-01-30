@@ -151,7 +151,7 @@ export default function ManageServicesPage({ params }: { params: Promise<{ id: s
 
                                 {/* Actions */}
                                 <div className="flex gap-2 w-full md:w-auto">
-                                    <Link href={`/services/edit/${service.id}`} className="flex-1 md:flex-none">
+                                    <Link href={`/service/edit/${service.id}`} className="flex-1 md:flex-none">
                                         <button className="w-full md:w-auto px-4 py-2 border border-neutral-200 dark:border-neutral-800 rounded-lg text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors flex items-center justify-center gap-2">
                                             <Edit2 className="w-4 h-4" /> Edit
                                         </button>
