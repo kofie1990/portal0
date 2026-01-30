@@ -3,7 +3,7 @@
 import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera, Bell, BarChart } from "lucide-react";
+import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera, Bell, BarChart, Phone } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -21,7 +21,7 @@ type Service = Database['public']['Tables']['services']['Row'] & {
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
     services: { name: string; price_amount: number; price_currency: string; image_url: string | null; images: string[] | null } | null;
     businesses: { name: string } | null;
-    profiles: { full_name: string; avatar_url: string | null } | null;
+    profiles: { full_name: string; avatar_url: string | null; phone: string | null } | null;
 };
 
 export default function AccountPage() {
@@ -49,83 +49,53 @@ export default function AccountPage() {
         const fetchData = async () => {
             if (!user) return;
 
-            if (activeTab === 'businesses') {
-                const { data } = await supabase.from('businesses').select('*').eq('owner_id', user.id);
-                if (data) setMyBusinesses(data);
+            // Fetch Businesses
+            const { data: bizData } = await supabase.from('businesses').select('*').eq('owner_id', user.id);
+            if (bizData) setMyBusinesses(bizData);
+            const businessIds = bizData?.map(b => b.id) || [];
+
+            // Fetch Listings
+            let listingsQuery = supabase
+                .from('services')
+                .select('*, businesses(name)');
+
+            if (businessIds.length > 0) {
+                listingsQuery = listingsQuery.or(`profile_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
+            } else {
+                listingsQuery = listingsQuery.eq('profile_id', user.id);
             }
 
-            if (activeTab === 'listings') {
-                // ... (Existing Listings Logic)
-                const { data: bizData } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
-                const businessIds = bizData?.map(b => b.id) || [];
+            const { data: serviceData } = await listingsQuery;
+            if (serviceData) setMyListings(serviceData as any);
 
-                let query = supabase
-                    .from('services')
-                    .select('*, businesses(name)');
+            // Fetch My Bookings (As Customer)
+            const { data: myBookingsData } = await supabase
+                .from('bookings')
+                .select(`
+                    *,
+                    services (name, price_amount, price_currency, image_url, images),
+                    businesses (name),
+                    profiles:profiles!provider_id (full_name, avatar_url)
+                `)
+                .eq('user_id', user.id)
+                .order('booking_date', { ascending: false });
 
-                if (businessIds.length > 0) {
-                    query = query.or(`profile_id.eq.${user.id},business_id.in.(${businessIds.join(',')})`);
-                } else {
-                    query = query.eq('profile_id', user.id);
-                }
+            if (myBookingsData) setMyBookings(myBookingsData as any);
 
-                const { data: serviceData, error } = await query;
-                if (serviceData) setMyListings(serviceData as any);
-            }
-
-            if (activeTab === 'bookings') {
-                const { data: bookingsData, error } = await supabase
+            // Fetch Provider Bookings (As Service Provider) -> For Calendar & Client Bookings
+            if (businessIds.length > 0) {
+                const { data: providerData } = await supabase
                     .from('bookings')
                     .select(`
                         *,
                         services (name, price_amount, price_currency, image_url, images),
                         businesses (name),
-                        profiles:profiles!provider_id (full_name, avatar_url)
+                        profiles:profiles!user_id (full_name, avatar_url, phone)
                     `)
-                    .eq('user_id', user.id)
-                    .order('booking_date', { ascending: false });
+                    .neq('status', 'cancelled')
+                    .in('business_id', businessIds);
 
-                if (error) console.error("Error fetching bookings:", error);
-                if (bookingsData) setMyBookings(bookingsData as any);
-            }
-
-            if (activeTab === 'calendar') {
-                // Fetch My Bookings (As Customer)
-                const { data: myBookingsData } = await supabase
-                    .from('bookings')
-                    .select(`
-                        *,
-                        services (name, price_amount, price_currency, image_url, images),
-                        businesses (name),
-                        profiles:profiles!provider_id (full_name, avatar_url)
-                    `)
-                    .eq('user_id', user.id)
-                    .neq('status', 'cancelled');
-
-                // Fetch Provider Bookings (As Service Provider)
-                // 1. Get my businesses IDs first
-                const { data: bizData } = await supabase.from('businesses').select('id').eq('owner_id', user.id);
-                const businessIds = bizData?.map(b => b.id) || [];
-
-                let providerBookingsData: any[] = [];
-
-                if (businessIds.length > 0) {
-                    const { data } = await supabase
-                        .from('bookings')
-                        .select(`
-                            *,
-                            services (name, price_amount, price_currency, image_url, images),
-                            businesses (name),
-                            profiles:profiles!user_id (full_name, avatar_url)
-                        `)
-                        .neq('status', 'cancelled')
-                        .in('business_id', businessIds);
-
-                    if (data) providerBookingsData = data;
-                }
-
-                if (myBookingsData) setMyBookings(myBookingsData as any);
-                if (providerBookingsData) setProviderBookings(providerBookingsData as any);
+                if (providerData) setProviderBookings(providerData as any);
             }
         };
 
@@ -372,6 +342,14 @@ export default function AccountPage() {
                                     >
                                         <List className="w-4 h-4" /> My Bookings
                                     </button>
+                                    {(myListings.length > 0 || myBusinesses.length > 0) && (
+                                        <button
+                                            onClick={() => setActiveTab("client_bookings")}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "client_bookings" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
+                                        >
+                                            <User className="w-4 h-4" /> Client Bookings
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setActiveTab("calendar")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "calendar" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
@@ -501,10 +479,66 @@ export default function AccountPage() {
                                                     </div>
 
                                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                                        <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
-                                                            <span className="text-orange-600 font-bold text-2xl block mb-1">2</span>
-                                                            <span className="text-xs font-bold tracking-wider text-orange-600/70 uppercase">Upcoming Bookings</span>
-                                                        </div>
+                                                        {/* Next Booking Countdown Card */}
+                                                        {(() => {
+                                                            const now = new Date();
+                                                            const allBookings = [...myBookings, ...providerBookings]
+                                                                .filter(b => b.status === 'confirmed' && new Date(b.booking_date) > now)
+                                                                .sort((a, b) => new Date(a.booking_date).getTime() - new Date(b.booking_date).getTime());
+
+                                                            const nextBooking = allBookings[0];
+
+                                                            if (!nextBooking) return (
+                                                                <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 col-span-2">
+                                                                    <span className="text-neutral-400 font-bold block mb-1">No upcoming bookings</span>
+                                                                    <span className="text-xs font-bold tracking-wider text-neutral-400/70 uppercase">Find a service to book!</span>
+                                                                    <Link href="/businesses" className="mt-3 block text-xs font-bold text-blue-600 hover:underline">Explore Businesses &rarr;</Link>
+                                                                </div>
+                                                            );
+
+                                                            const isMyBooking = nextBooking.user_id === user?.id; // I am the customer
+                                                            const bookingDate = new Date(nextBooking.booking_date);
+                                                            const diffMs = bookingDate.getTime() - now.getTime();
+                                                            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                                            const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+                                                            // Theme based on type
+                                                            const bgClass = isMyBooking
+                                                                ? "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/30"
+                                                                : "bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/30";
+                                                            const textClass = isMyBooking
+                                                                ? "text-blue-600 dark:text-blue-400"
+                                                                : "text-amber-600 dark:text-amber-400";
+                                                            const labelClass = isMyBooking
+                                                                ? "text-blue-600/70 dark:text-blue-400/60"
+                                                                : "text-amber-600/70 dark:text-amber-400/60";
+
+                                                            return (
+                                                                <div className={`p-4 rounded-xl border ${bgClass} col-span-2 flex flex-col justify-between`}>
+                                                                    <div>
+                                                                        <div className="flex justify-between items-start mb-2">
+                                                                            <span className={`text-xs font-bold tracking-wider uppercase ${labelClass}`}>
+                                                                                {isMyBooking ? "My Next Appointment" : "Next Client Booking"}
+                                                                            </span>
+                                                                            {diffDays < 1 && <span className="text-[10px] font-bold px-2 py-0.5 bg-red-100 text-red-600 rounded-full animate-pulse">Soon</span>}
+                                                                        </div>
+                                                                        <h4 className={`font-heading font-bold text-lg leading-tight mb-1 ${textClass}`}>
+                                                                            {nextBooking.services?.name}
+                                                                        </h4>
+                                                                        <p className={`text-xs ${labelClass} opacity-80 mb-3`}>
+                                                                            {isMyBooking ? `at ${nextBooking.businesses?.name}` : `with ${nextBooking.profiles?.full_name}`}
+                                                                        </p>
+                                                                    </div>
+
+                                                                    <div className="flex items-end gap-1">
+                                                                        <div className={`text-2xl font-bold ${textClass}`}>
+                                                                            {diffDays > 0 ? `${diffDays}d` : ''} {diffHrs}h
+                                                                        </div>
+                                                                        <span className={`text-xs font-bold mb-1.5 ${labelClass}`}>until session</span>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
                                                         <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
                                                             <span className="text-blue-600 font-bold text-2xl block mb-1">5</span>
                                                             <span className="text-xs font-bold tracking-wider text-blue-600/70 uppercase">Favorite Providers</span>
@@ -768,6 +802,83 @@ export default function AccountPage() {
                                                                     </button>
                                                                 </Link>
                                                             )}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {activeTab === "client_bookings" && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="font-heading text-2xl font-bold">Client Bookings</h3>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {providerBookings.length === 0 ? (
+                                                <div className="text-center py-12 text-neutral-500">
+                                                    <p>No client bookings yet.</p>
+                                                </div>
+                                            ) : (
+                                                providerBookings.map((booking) => (
+                                                    <div key={booking.id} className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 hover:shadow-sm transition-shadow">
+                                                        <div className="flex flex-col md:flex-row gap-5">
+                                                            {/* Client Info */}
+                                                            <div className="flex items-start gap-4 flex-1">
+                                                                <div className="flex-shrink-0">
+                                                                    <div className="w-14 h-14 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden border-2 border-white dark:border-neutral-900 shadow-sm relative">
+                                                                        {booking.profiles?.avatar_url ? (
+                                                                            <Image
+                                                                                src={booking.profiles.avatar_url}
+                                                                                alt={booking.profiles.full_name || "Client"}
+                                                                                fill
+                                                                                className="object-cover"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="w-full h-full flex items-center justify-center text-lg font-bold text-neutral-400">
+                                                                                {(booking.profiles?.full_name?.[0] || "C").toUpperCase()}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 className="font-heading font-bold text-lg mb-1">{booking.profiles?.full_name || "Guest User"}</h4>
+                                                                    <div className="flex items-center gap-2 text-sm text-neutral-500 mb-2">
+                                                                        <span className="font-medium text-black dark:text-white">{booking.services?.name}</span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap items-center gap-3">
+                                                                        <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 bg-neutral-100 dark:bg-neutral-900 px-2 py-1 rounded-md">
+                                                                            <Calendar className="w-3 h-3" />
+                                                                            {new Date(booking.booking_date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                                        </div>
+                                                                        <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 bg-neutral-100 dark:bg-neutral-900 px-2 py-1 rounded-md">
+                                                                            <Clock className="w-3 h-3" />
+                                                                            {new Date(booking.booking_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Actions */}
+                                                            <div className="flex md:flex-col gap-2 justify-center min-w-[140px]">
+                                                                <button
+                                                                    className="flex-1 px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                                                                    onClick={() => alert("Reminder sent!")}
+                                                                >
+                                                                    <Bell className="w-3.5 h-3.5" />
+                                                                    Send Reminder
+                                                                </button>
+                                                                {booking.profiles?.phone && (
+                                                                    <a href={`tel:${booking.profiles.phone}`} className="flex-1">
+                                                                        <button className="w-full px-4 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2">
+                                                                            <Clock className="w-3.5 h-3.5" /> {/* Phone Icon replacement since Phone might not be imported, using Clock for now or check imports */}
+                                                                            Call Client
+                                                                        </button>
+                                                                    </a>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))

@@ -9,10 +9,11 @@ type Booking = {
     id: string;
     booking_date: string;
     status: string;
-    services: { name: string; price_amount: number; price_currency: string } | null;
+    services: { name: string; price_amount: number; price_currency: string; image_url: string | null; images: string[] | null } | null;
     businesses: { name: string } | null;
     profiles: { full_name: string; avatar_url: string | null } | null;
     provider_id?: string | null; // check if I am the provider
+    user_id: string;
 };
 
 interface CalendarViewProps {
@@ -121,7 +122,7 @@ export default function CalendarView({ bookings, currentUserId }: CalendarViewPr
                                 {dayBookings.length > 0 && (
                                     <div className="flex gap-1 mt-1">
                                         {dayBookings.slice(0, 3).map((b, idx) => {
-                                            const isProvider = b.provider_id === currentUserId;
+                                            const isProvider = b.user_id !== currentUserId;
                                             return (
                                                 <div
                                                     key={idx}
@@ -160,7 +161,7 @@ export default function CalendarView({ bookings, currentUserId }: CalendarViewPr
                     <div className="space-y-4">
                         {selectedDayBookings.length > 0 ? (
                             selectedDayBookings.map(booking => {
-                                const isProvider = booking.provider_id === currentUserId;
+                                const isProvider = booking.user_id !== currentUserId;
                                 return (
                                     <motion.div
                                         key={booking.id}
@@ -195,7 +196,14 @@ export default function CalendarView({ bookings, currentUserId }: CalendarViewPr
 
                                         <div className="flex items-center gap-3 mb-3">
                                             <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-white dark:border-neutral-700">
-                                                {booking.profiles?.avatar_url ? (
+                                                {(booking.services?.image_url || booking.services?.images?.[0]) ? (
+                                                    <Image
+                                                        src={booking.services.image_url || booking.services.images![0]}
+                                                        alt={booking.services.name}
+                                                        fill
+                                                        className="object-cover"
+                                                    />
+                                                ) : booking.profiles?.avatar_url ? (
                                                     <Image src={booking.profiles.avatar_url} alt="Profile" fill className="object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-xs font-bold text-neutral-400">
