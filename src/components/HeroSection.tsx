@@ -1,9 +1,30 @@
+"use client";
+
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function HeroSection() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            setIsAuthenticated(!!user);
+        };
+        checkUser();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setIsAuthenticated(!!session?.user);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [supabase]);
+
     return (
         <section className="min-h-[auto] pt-16 grid grid-cols-1 lg:grid-cols-12 gap-0">
 
@@ -31,7 +52,7 @@ export default function HeroSection() {
                         >
                             START SEARCHING <ArrowRight className="w-4 h-4" />
                         </button>
-                        <Link href="/list">
+                        <Link href={isAuthenticated ? "/list" : "/login?redirect=/list"}>
                             <button className="border border-neutral-200 dark:border-neutral-800 px-8 py-4 text-sm font-bold tracking-wide rounded-full hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
                                 LIST YOUR SERVICE
                             </button>
