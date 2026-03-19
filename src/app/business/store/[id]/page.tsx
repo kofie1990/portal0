@@ -29,11 +29,17 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
             const supabase = createClient();
             const { data: b, error } = await supabase
                 .from('businesses')
-                .select('*, services(*)')
+                .select('*, services(*), reviews(*)')
                 .eq('id', id)
                 .single();
 
             if (b && !error) {
+                // Calculate dynamic rating and review counts
+                const reviewCount = b.reviews?.length || 0;
+                const averageRating = reviewCount > 0 
+                    ? (b.reviews.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / reviewCount).toFixed(1)
+                    : 0;
+                
                 // Map DB to UI
                 setVendor({
                     id: b.id,
@@ -41,8 +47,8 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                     category: b.category,
                     location: b.location_address,
                     address: b.location_address,
-                    rating: b.rating || 0,
-                    reviews: b.review_count || 0,
+                    rating: typeof averageRating === 'string' ? parseFloat(averageRating) : averageRating,
+                    reviews: reviewCount,
                     imageUrl: b.image_url,
                     coverImage: b.cover_image_url,
                     lat: b.lat,
