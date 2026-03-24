@@ -36,10 +36,10 @@ export default function HeroSection() {
                     transition={{ duration: 0.8, delay: 0.2 }}
                 >
                     <h1 className="font-heading text-6xl lg:text-8xl font-bold leading-[0.9] tracking-tighter mb-8 max-w-lg">
-                        Find exactly what you need.
+                        Find the best local service providers near you.
                     </h1>
                     <p className="text-lg lg:text-xl text-neutral-500 max-w-sm mb-12 leading-relaxed">
-                        Stop searching blindly. Portal connects you directly to local businesses nearby.
+                        Stop searching blindly. Portal connects you directly to local service providers nearby.
                     </p>
 
                     <div className="flex flex-col sm:flex-row gap-4">
