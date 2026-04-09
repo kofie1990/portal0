@@ -57,7 +57,7 @@ export async function confirmBooking(bookingId: string) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    from: 'Portal <onboarding@resend.dev>', // Use verified domain in prod
+                    from: 'Portal <admin@mail.myportalgh.com>', // Use verified domain in prod
                     to: [customerEmail],
                     subject: 'Booking Confirmed!',
                     html: BookingConfirmedEmailHtml({
