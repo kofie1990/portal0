@@ -8,6 +8,7 @@ import { ArrowLeft, Calendar, Clock, Check, CreditCard, Info, ChevronRight, User
 import Image from "next/image";
 import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/client";
+import { fetchBusinessBookings } from "@/app/actions/booking";
 
 function BookingContent() {
     const searchParams = useSearchParams();
@@ -60,16 +61,12 @@ function BookingContent() {
             const startDate = dates[0].fullDate.toISOString();
             const endDate = dates[dates.length - 1].fullDate.toISOString();
 
-            const { data } = await supabase
-                .from('bookings')
-                .select('booking_date, service_id, status')
-                .eq('business_id', businessId)
-                .in('status', ['pending_payment', 'confirmed'])
-                .gte('booking_date', startDate)
-                .lte('booking_date', endDate);
+            const { data, error } = await fetchBusinessBookings(businessId, startDate, endDate);
 
-            if (data) {
-                setExistingBookings(data);
+            if (error) {
+                console.error("Failed to fetch capacity:", error);
+            } else if (data) {
+                setExistingBookings(data as any[]);
             }
         };
 

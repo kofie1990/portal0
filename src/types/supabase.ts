@@ -64,6 +64,7 @@ export interface Database {
                     category: string | null
                     bio: string | null
                     description: string | null
+                    booking_policies: string | null
                     location_address: string | null
                     lat: number | null
                     lng: number | null
@@ -90,6 +91,7 @@ export interface Database {
                     category?: string | null
                     bio?: string | null
                     description?: string | null
+                    booking_policies?: string | null
                     location_address?: string | null
                     lat?: number | null
                     lng?: number | null
@@ -116,6 +118,7 @@ export interface Database {
                     category?: string | null
                     bio?: string | null
                     description?: string | null
+                    booking_policies?: string | null
                     location_address?: string | null
                     lat?: number | null
                     lng?: number | null
@@ -199,7 +202,7 @@ export interface Database {
                 Row: {
                     id: string
                     created_at: string
-                    user_id: string
+                    user_id: string | null
                     business_id: string | null
                     provider_id: string | null
                     service_id: string | null
@@ -209,11 +212,14 @@ export interface Database {
                     paystack_reference: string | null
                     notes: string | null
                     amount_paid: number | null // Added
+                    guest_name: string | null
+                    guest_email: string | null
+                    guest_phone: string | null
                 }
                 Insert: {
                     id?: string
                     created_at?: string
-                    user_id: string
+                    user_id?: string | null
                     business_id?: string | null
                     provider_id?: string | null
                     service_id?: string | null
@@ -223,11 +229,14 @@ export interface Database {
                     paystack_reference?: string | null
                     notes?: string | null
                     amount_paid?: number | null // Added
+                    guest_name?: string | null
+                    guest_email?: string | null
+                    guest_phone?: string | null
                 }
                 Update: {
                     id?: string
                     created_at?: string
-                    user_id?: string
+                    user_id?: string | null
                     business_id?: string | null
                     provider_id?: string | null
                     service_id?: string | null
@@ -237,6 +246,9 @@ export interface Database {
                     paystack_reference?: string | null
                     notes?: string | null
                     amount_paid?: number | null // Added
+                    guest_name?: string | null
+                    guest_email?: string | null
+                    guest_phone?: string | null
                 }
             }
             reviews: {

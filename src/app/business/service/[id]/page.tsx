@@ -10,6 +10,7 @@ import MapPlaceholder from "@/components/MapPlaceholder";
 import { notFound } from "next/navigation";
 import { use, useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useUserLocation } from "@/hooks/useUserLocation";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
@@ -21,6 +22,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
     const { id } = use(params);
     const [vendor, setVendor] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { calculateDistance } = useUserLocation();
 
     useEffect(() => {
         const fetchVendor = async () => {
@@ -34,7 +36,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
             if (b && !error) {
                 // Calculate dynamic rating and review counts
                 const reviewCount = b.reviews?.length || 0;
-                const averageRating = reviewCount > 0 
+                const averageRating = reviewCount > 0
                     ? (b.reviews.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / reviewCount).toFixed(1)
                     : 0;
 
@@ -138,7 +140,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                             <div className="space-y-4 text-sm font-medium mb-8">
                                 <div className="flex items-center gap-3">
                                     <MapPin className="w-5 h-5 text-neutral-400" />
-                                    <span>{vendor.address}</span>
+                                    <span>{vendor.address} {calculateDistance(vendor.lat, vendor.lng) ? `• ${calculateDistance(vendor.lat, vendor.lng)}` : ""}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Star className="w-5 h-5 fill-black dark:fill-white" />

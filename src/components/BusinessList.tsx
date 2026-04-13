@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Business } from "@/types/ui";
 import { motion } from "framer-motion";
+import { useUserLocation } from "@/hooks/useUserLocation";
 
 interface BusinessListProps {
     businesses: Business[];
@@ -12,6 +13,8 @@ interface BusinessListProps {
 }
 
 export default function BusinessList({ businesses, layout = "grid" }: BusinessListProps) {
+    const { calculateDistance } = useUserLocation();
+
     if (businesses.length === 0) {
         return (
             <div className="text-center py-20 bg-neutral-50 dark:bg-neutral-900/50 rounded-3xl border border-dashed border-neutral-200 dark:border-neutral-800">
@@ -58,7 +61,7 @@ export default function BusinessList({ businesses, layout = "grid" }: BusinessLi
                             </div>
                             <div className="flex items-center gap-1 text-neutral-500 text-sm mt-auto">
                                 <MapPin className="w-3 h-3" />
-                                {business.location} • {business.distance}
+                                {business.location} {calculateDistance(business.lat, business.lng) ? `• ${calculateDistance(business.lat, business.lng)}` : ""}
                             </div>
                         </motion.div>
                     </Link>

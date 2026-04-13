@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/client';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { sendBookingConfirmedEmail } from '@/app/actions/booking';
 
 // We need a service role client to update bookings securely without RLS issues if the user is not logged in context (webhook/callback)
 export async function GET(req: Request) {
@@ -75,6 +76,9 @@ export async function GET(req: Request) {
             console.error('Supabase Update Error:', error);
             return NextResponse.json({ error: 'Failed to update booking status' }, { status: 500 });
         }
+
+        // 3. Send Booking Confirmed Email (Includes guests!)
+        await sendBookingConfirmedEmail(bookingId);
 
         return NextResponse.json({ success: true, bookingId });
 

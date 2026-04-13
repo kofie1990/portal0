@@ -8,6 +8,7 @@ import { ArrowLeft, Calendar, Clock, MapPin, ShieldCheck, Loader2 } from "lucide
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import Navigation from "@/components/Navigation";
+import { createBookingAction, fetchServiceBookings } from "@/app/actions/booking";
 
 export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -24,6 +25,18 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [existingBookings, setExistingBookings] = useState<any[]>([]);
+
+    // State for User & Guest
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [guestName, setGuestName] = useState("");
+    const [guestEmail, setGuestEmail] = useState("");
+    const [guestPhone, setGuestPhone] = useState("");
+
+    useEffect(() => {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) setCurrentUser(user);
+        });
+    }, [supabase]);
 
     // Helper: Generate Dates
     const getAvailableDates = () => {
@@ -73,16 +86,12 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
             const startDate = dates[0].fullDate.toISOString();
             const endDate = dates[dates.length - 1].fullDate.toISOString();
 
-            const { data } = await supabase
-                .from('bookings')
-                .select('booking_date, service_id, status')
-                .eq('service_id', service.id) // Filter by service directly here
-                .in('status', ['pending_payment', 'confirmed'])
-                .gte('booking_date', startDate)
-                .lte('booking_date', endDate);
+            const { data, error } = await fetchServiceBookings(service.id, startDate, endDate);
 
-            if (data) {
-                setExistingBookings(data);
+            if (error) {
+                console.error("Failed to fetch capacity:", error);
+            } else if (data) {
+                setExistingBookings(data as any[]);
             }
         };
         if (service) fetchBookings();
@@ -118,11 +127,20 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
         setIsBooking(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                showToast("Please login to book.", "error");
-                router.push("/auth");
-                return;
+            const userId = currentUser?.id || null;
+
+            if (!userId) {
+                if (!guestName.trim() || !guestEmail.trim() || !guestPhone.trim()) {
+                    showToast("Please fill in all your contact details to proceed.", "error");
+                    setIsBooking(false);
+                    return;
+                }
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(guestEmail)) {
+                    showToast("Please enter a valid email address.", "error");
+                    setIsBooking(false);
+                    return;
+                }
             }
 
             const deposit = service.deposit_amount || 0;
@@ -152,34 +170,33 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                 return;
             }
 
-            // 1. Create Booking (Pending Payment)
-            const { data: bookingData, error: bookingError } = await supabase
-                .from('bookings')
-                .insert({
-                    user_id: user.id,
-                    service_id: service.id,
-                    business_id: service.business_id,
-                    provider_id: service.profile_id,
-                    booking_date: bookingISO,
-                    status: 'pending_payment',
-                    total_amount: total,
-                    amount_paid: 0,
-                    notes: "Booking initialized",
-                })
-                .select()
-                .single();
+            // 1. Create Booking (Pending Payment) via Server Action (Bypasses RLS for Anon)
+            const { data: bookingData, error: bookingError } = await createBookingAction({
+                user_id: userId,
+                guest_name: userId ? null : guestName.trim(),
+                guest_email: userId ? null : guestEmail.trim().toLowerCase(),
+                guest_phone: userId ? null : guestPhone.trim(),
+                service_id: service.id,
+                business_id: service.business_id,
+                provider_id: service.profile_id,
+                booking_date: bookingISO,
+                status: 'pending_payment',
+                total_amount: total,
+                amount_paid: 0,
+                notes: "Booking initialized",
+            });
 
-            if (bookingError) throw bookingError;
+            if (bookingError || !bookingData) throw new Error(bookingError || "Failed to create booking");
+
+            const emailToUse = currentUser?.email || guestEmail.trim().toLowerCase();
 
             // 2. Initialize Paystack
             const res = await fetch('/api/paystack/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: user.email,
-                    amount: deposit, // Paystack expects amount in main currency if logic in API handles *100. 
-                    // Checking api/paystack/initialize logic:
-                    // "amount: amount * 100" -> So we send amount in GHS, api converts to pesewas. Correct.
+                    email: emailToUse,
+                    amount: deposit, // Paystack expects amount in main currency if logic in API handles *100.
                     metadata: {
                         booking_id: bookingData.id,
                         vendorId: service.business_id || service.profile_id, // For split payments if needed
@@ -331,6 +348,46 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                                         </div>
                                     </div>
                                 </div>
+                                {/* Guest Contact Details (Only show if not logged in) */}
+                                {!currentUser && (
+                                    <div className="space-y-4 pt-6 border-t border-neutral-100 dark:border-neutral-800">
+                                        <h3 className="font-bold text-sm">CONTACT DETAILS</h3>
+                                        <div className="grid gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-neutral-500 mb-1.5 block">Full Name</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={guestName}
+                                                    onChange={e => setGuestName(e.target.value)}
+                                                    placeholder="John Doe"
+                                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black dark:focus:border-white transition-colors"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-neutral-500 mb-1.5 block">Email Address</label>
+                                                    <input 
+                                                        type="email" 
+                                                        value={guestEmail}
+                                                        onChange={e => setGuestEmail(e.target.value)}
+                                                        placeholder="john@example.com"
+                                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black dark:focus:border-white transition-colors"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-neutral-500 mb-1.5 block">Phone Number</label>
+                                                    <input 
+                                                        type="tel" 
+                                                        value={guestPhone}
+                                                        onChange={e => setGuestPhone(e.target.value)}
+                                                        placeholder="+233 XX XXX XXXX"
+                                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black dark:focus:border-white transition-colors"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Price Breakdown */}
                                 <div className="space-y-3 py-6 border-t border-b border-neutral-100 dark:border-neutral-800">

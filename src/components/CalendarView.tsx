@@ -13,7 +13,9 @@ type Booking = {
     businesses: { name: string } | null;
     profiles: { full_name: string; avatar_url: string | null } | null;
     provider_id?: string | null; // check if I am the provider
-    user_id: string;
+    user_id: string | null;
+    guest_name?: string | null;
+    guest_email?: string | null;
 };
 
 interface CalendarViewProps {
@@ -207,13 +209,13 @@ export default function CalendarView({ bookings, currentUserId }: CalendarViewPr
                                                     <Image src={booking.profiles.avatar_url} alt="Profile" fill className="object-cover" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-xs font-bold text-neutral-400">
-                                                        {(booking.profiles?.full_name?.[0] || "?")}
+                                                        {(booking.profiles?.full_name?.[0] || booking.guest_name?.[0] || "?").toUpperCase()}
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold truncate">
-                                                    {isProvider ? booking.profiles?.full_name : booking.businesses?.name}
+                                                    {isProvider ? (booking.profiles?.full_name || booking.guest_name || "Guest") : booking.businesses?.name}
                                                 </p>
                                                 <p className="text-[10px] text-neutral-500 truncate">
                                                     {isProvider ? "Client" : "Service Provider"}

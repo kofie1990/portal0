@@ -99,7 +99,7 @@ export default function NotificationsSheet({
                                                     <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-2">
                                                         {role === 'provider' ? (
                                                             <>
-                                                                <span className="font-bold">{booking.profiles?.full_name || 'Guest'}</span> requested
+                                                                <span className="font-bold">{booking.profiles?.full_name || booking.guest_name || 'Guest'}</span> requested
                                                                 <span className="font-bold"> {booking.services?.name}</span>
                                                             </>
                                                         ) : (

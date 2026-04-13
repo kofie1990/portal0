@@ -85,8 +85,10 @@ export default function AccountPage() {
             if (myBookingsData) setMyBookings(myBookingsData as any);
 
             // Fetch Provider Bookings (As Service Provider) -> For Calendar & Client Bookings
+            // Case 1: Bookings for services under the provider's businesses
+            let businessProviderBookings: any[] = [];
             if (businessIds.length > 0) {
-                const { data: providerData } = await supabase
+                const { data: bizProviderData } = await supabase
                     .from('bookings')
                     .select(`
                         *,
@@ -97,8 +99,32 @@ export default function AccountPage() {
                     .neq('status', 'cancelled')
                     .in('business_id', businessIds);
 
-                if (providerData) setProviderBookings(providerData as any);
+                if (bizProviderData) businessProviderBookings = bizProviderData;
             }
+
+            // Case 2: Bookings for individually-listed services (no business_id, uses provider_id)
+            const { data: individualProviderData } = await supabase
+                .from('bookings')
+                .select(`
+                    *,
+                    services (name, price_amount, price_currency, image_url, images),
+                    businesses (name),
+                    profiles:profiles!user_id (full_name, avatar_url, phone)
+                `)
+                .neq('status', 'cancelled')
+                .eq('provider_id', user.id);
+
+            const individualProviderBookings = individualProviderData || [];
+
+            // Merge and deduplicate by booking id
+            const allProviderBookings = [
+                ...businessProviderBookings,
+                ...individualProviderBookings.filter(
+                    (b) => !businessProviderBookings.some((p) => p.id === b.id)
+                ),
+            ];
+
+            setProviderBookings(allProviderBookings as any);
         };
 
         const fetchNotifications = async () => {
@@ -109,8 +135,7 @@ export default function AccountPage() {
             const businessIds = businesses?.map(b => b.id) || [];
 
             // 2. Fetch Provider Notifications (Bookings for my services needing action)
-            // Assuming 'pending_payment' or just created bookings are "new"
-            let providerData: any[] = [];
+            let bizProviderNotifs: any[] = [];
 
             if (businessIds.length > 0) {
                 const { data } = await supabase
@@ -124,10 +149,28 @@ export default function AccountPage() {
                     .neq('status', 'cancelled') // Get active ones
                     .in('business_id', businessIds);
 
-                if (data) providerData = data;
+                if (data) bizProviderNotifs = data;
             }
 
-            const providerNotifications = providerData || [];
+            // Also fetch individual provider notifications (for services listed without a business)
+            const { data: indivProviderNotifData } = await supabase
+                .from('bookings')
+                .select(`
+                    *,
+                    services (name, price_amount, price_currency, image_url, images),
+                    businesses (name),
+                    profiles:profiles!user_id (full_name)
+                `)
+                .neq('status', 'cancelled')
+                .eq('provider_id', user.id);
+
+            const indivProviderNotifs = indivProviderNotifData || [];
+
+            // Merge and deduplicate
+            const providerNotifications = [
+                ...bizProviderNotifs,
+                ...indivProviderNotifs.filter((b) => !bizProviderNotifs.some((p) => p.id === b.id)),
+            ];
 
             // 3. Fetch Customer Notifications (Updates on my bookings)
             // Mostly just show recent confirmations?
@@ -573,7 +616,7 @@ export default function AccountPage() {
                                                                             {nextBooking.services?.name}
                                                                         </h4>
                                                                         <p className={`text-xs ${labelClass} opacity-80 mb-3`}>
-                                                                            {isMyBooking ? `at ${nextBooking.businesses?.name}` : `with ${nextBooking.profiles?.full_name}`}
+                                                                            {isMyBooking ? `at ${nextBooking.businesses?.name}` : `with ${nextBooking.profiles?.full_name || nextBooking.guest_name || "Guest"}`}
                                                                         </p>
                                                                     </div>
 
@@ -879,19 +922,19 @@ export default function AccountPage() {
                                                                         {booking.profiles?.avatar_url ? (
                                                                             <Image
                                                                                 src={booking.profiles.avatar_url}
-                                                                                alt={booking.profiles.full_name || "Client"}
+                                                                                alt={booking.profiles.full_name || booking.guest_name || "Client"}
                                                                                 fill
                                                                                 className="object-cover"
                                                                             />
                                                                         ) : (
                                                                             <div className="w-full h-full flex items-center justify-center text-lg font-bold text-neutral-400">
-                                                                                {(booking.profiles?.full_name?.[0] || "C").toUpperCase()}
+                                                                                {(booking.profiles?.full_name?.[0] || booking.guest_name?.[0] || "C").toUpperCase()}
                                                                             </div>
                                                                         )}
                                                                     </div>
                                                                 </div>
                                                                 <div>
-                                                                    <h4 className="font-heading font-bold text-lg mb-1">{booking.profiles?.full_name || "Guest User"}</h4>
+                                                                    <h4 className="font-heading font-bold text-lg mb-1">{booking.profiles?.full_name || booking.guest_name || "Guest User"}</h4>
                                                                     <div className="flex items-center gap-2 text-sm text-neutral-500 mb-2">
                                                                         <span className="font-medium text-black dark:text-white">{booking.services?.name}</span>
                                                                     </div>
@@ -917,8 +960,8 @@ export default function AccountPage() {
                                                                     <Bell className="w-3.5 h-3.5" />
                                                                     Send Reminder
                                                                 </button>
-                                                                {booking.profiles?.phone && (
-                                                                    <a href={`tel:${booking.profiles.phone}`} className="flex-1">
+                                                                {(booking.profiles?.phone || booking.guest_phone) && (
+                                                                    <a href={`tel:${booking.profiles?.phone || booking.guest_phone}`} className="flex-1">
                                                                         <button className="w-full px-4 py-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors flex items-center justify-center gap-2">
                                                                             <Clock className="w-3.5 h-3.5" /> {/* Phone Icon replacement since Phone might not be imported, using Clock for now or check imports */}
                                                                             Call Client

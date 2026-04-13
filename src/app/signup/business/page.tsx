@@ -23,6 +23,7 @@ const existingUserSchema = z.object({
     businessName: z.string().min(2, "Business name is required"),
     category: z.string().min(1, "Category is required"),
     description: z.string().min(10, "Description must be at least 10 characters"),
+    bookingPolicies: z.string().optional(),
     location: z.string().min(5, "Location is required"),
     businessType: z.enum(["store", "service"]),
     depositFee: z.string().optional().transform(val => (val === "" ? undefined : Number(val))),
@@ -140,6 +141,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
             businessName: "",
             category: "",
             description: "",
+            bookingPolicies: "",
             location: "",
             businessType: "store",
             depositFee: "",
@@ -232,6 +234,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                     category: data.category,
                     bio: data.bio, // [NEW]
                     description: data.description,
+                    booking_policies: data.bookingPolicies,
                     location_address: data.location,
                     lat: null,
                     lng: null,
@@ -282,6 +285,7 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                                 category: data.category,
                                 bio: data.bio, // [NEW]
                                 description: data.description,
+                                booking_policies: data.bookingPolicies,
                                 location_address: data.location,
                                 location_type: locationType,
                                 deposit_fee: data.depositFee || 0,
@@ -598,6 +602,23 @@ function StepDetails({ control, errors }: any) {
                 />
 
                 <Controller
+                    name="bookingPolicies"
+                    control={control}
+                    render={({ field }) => (
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold ml-1">CANCELLATION & BOOKING POLICIES</label>
+                            <textarea
+                                {...field}
+                                rows={2}
+                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors resize-none"
+                                placeholder="e.g. Needs 24hr notice for cancellations, no refunds on deposits..."
+                            />
+                            {errors.bookingPolicies && <p className="text-xs text-red-500 font-bold ml-1">{errors.bookingPolicies.message}</p>}
+                        </div>
+                    )}
+                />
+
+                <Controller
                     name="location"
                     control={control}
                     render={({ field }) => (
@@ -760,7 +781,7 @@ function StepRefinement({ control, watch, setValue }: any) {
                             control={control}
                             render={({ field }) => (
                                 <FileUpload
-                                    label="BUSINESS LOGO"
+                                    label="PROFILE IMAGE"
                                     value={field.value}
                                     onChange={field.onChange}
                                 />

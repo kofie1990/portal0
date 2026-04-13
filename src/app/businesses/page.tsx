@@ -7,10 +7,12 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import Navigation from "@/components/Navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useUserLocation } from "@/hooks/useUserLocation";
 
 export default function VendorsPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [businesses, setBusinesses] = useState<any[]>([]);
+    const { calculateDistance } = useUserLocation();
 
     useEffect(() => {
         const fetchBusinesses = async () => {
@@ -28,6 +30,8 @@ export default function VendorsPage() {
                     image: "bg-neutral-100",
                     imageUrl: b.image_url || b.cover_image_url,
                     address: b.location_address,
+                    lat: b.lat,
+                    lng: b.lng,
                     businessType: b.location_type === 'physical' ? 'store' : 'service',
                 }));
                 setBusinesses(mapped);
@@ -105,7 +109,7 @@ export default function VendorsPage() {
                                     </div>
                                     <div className="flex items-center gap-1 text-neutral-500 text-sm mt-auto">
                                         <MapPin className="w-3 h-3" />
-                                        {business.location}
+                                        {business.location} {calculateDistance(business.lat, business.lng) ? `• ${calculateDistance(business.lat, business.lng)}` : ""}
                                     </div>
                                 </motion.div>
                             </Link>

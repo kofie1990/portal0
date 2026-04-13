@@ -7,7 +7,7 @@ export async function POST(req: Request) {
         console.log("Paystack Init Body:", body);
         const { email, amount, subaccount, metadata } = body;
 
-        const subParams = subaccount ? { subaccount } : {};
+        const subParams = subaccount ? { subaccount, bearer: "subaccount" } : {};
 
         // [TEST BYPASS] Mock Initialization
         if (subaccount && subaccount.startsWith("ACCT_MOCK_")) {
@@ -23,12 +23,22 @@ export async function POST(req: Request) {
             });
         }
 
+        // Paystack Ghana Fee Structure: 1.95% per transaction
+        // To pass the charge to the customer, we calculate the total amount required
+        // so that the remaining amount after the percentage deduction is exactly the original amount.
+        // Formula: Final Amount = Target Amount / (1 - Fee Percentage)
+        const PAYSTACK_FEE_RATE = 0.0195;
+        const totalAmountToCharge = amount / (1 - PAYSTACK_FEE_RATE);
+
         const params = {
             email,
-            amount: Math.round(amount * 100), // Convert to kobo/pesewas AND round to integer
+            amount: Math.round(totalAmountToCharge * 100), // Convert to pesewas AND round to integer
             currency: "GHS",
             callback_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/book/callback?vendorId=${metadata.vendorId}`,
-            metadata,
+            metadata: {
+                ...metadata,
+                original_amount_charged: amount // keep track of true cost for reporting if needed
+            },
             ...subParams,
         };
 
