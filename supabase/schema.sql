@@ -59,6 +59,9 @@ create table businesses (
   paystack_subaccount_code text, -- e.g. "ACCT_xxxx"
   
   -- Settings
+  booking_policies text,
+  service_radius text,
+  time_slots jsonb default '{}',
   deposit_fee numeric default 0,
   open_now boolean default true,
   is_verified boolean default false,

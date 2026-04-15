@@ -56,13 +56,32 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
     };
 
     const dates = getAvailableDates();
-    const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+    
+    const getTimesForSelectedDate = () => {
+        if (!selectedDate || !service || !service.businesses?.time_slots) {
+            // Default fallback if nothing is selected or no custom slots exist
+            return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+        }
+
+        const dateObj = new Date(selectedDate);
+        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const dayStr = dayNames[dateObj.getDay()];
+
+        const slots = service.businesses.time_slots[dayStr];
+        if (Array.isArray(slots) && slots.length > 0) {
+            return slots;
+        }
+
+        return []; // No slots available for this specific day
+    };
+
+    const times = getTimesForSelectedDate();
 
     useEffect(() => {
         const fetchService = async () => {
             const { data, error } = await supabase
                 .from('services')
-                .select('*, businesses(name, id), profiles(full_name, id)')
+                .select('*, businesses(name, id, time_slots), profiles(full_name, id)')
                 .eq('id', id)
                 .single();
 
@@ -318,34 +337,40 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
                                     <div>
                                         <label className="text-sm font-bold ml-1 mb-3 block">SELECT TIME</label>
-                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                            {times.map((t) => {
-                                                const slotInfo = selectedDate ? getSlotInfo(selectedDate, t) : { available: true, count: 0, max: 1 };
-                                                const isAvailable = slotInfo.available;
-                                                const isSelected = selectedTime === t;
+                                        {times.length > 0 ? (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                                {times.map((t: string) => {
+                                                    const slotInfo = selectedDate ? getSlotInfo(selectedDate, t) : { available: true, count: 0, max: 1 };
+                                                    const isAvailable = slotInfo.available;
+                                                    const isSelected = selectedTime === t;
 
-                                                return (
-                                                    <button
-                                                        key={t}
-                                                        disabled={!isAvailable}
-                                                        onClick={() => setSelectedTime(t)}
-                                                        className={`py-2 rounded-xl text-xs font-bold border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${isSelected
-                                                            ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
-                                                            : !isAvailable
-                                                                ? "border-neutral-100 dark:border-neutral-800 text-neutral-300 dark:text-neutral-700 cursor-not-allowed bg-neutral-50 dark:bg-neutral-900/50"
-                                                                : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
-                                                            }`}
-                                                    >
-                                                        <span>{t}</span>
-                                                        {selectedDate && (
-                                                            <span className={`text-[9px] font-normal ${!isAvailable ? 'text-red-400' : 'text-neutral-400'}`}>
-                                                                {!isAvailable ? "Full" : `${slotInfo.count}/${slotInfo.max} Booked`}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
+                                                    return (
+                                                        <button
+                                                            key={t}
+                                                            disabled={!isAvailable}
+                                                            onClick={() => setSelectedTime(t)}
+                                                            className={`py-2 rounded-xl text-xs font-bold border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${isSelected
+                                                                ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
+                                                                : !isAvailable
+                                                                    ? "border-neutral-100 dark:border-neutral-800 text-neutral-300 dark:text-neutral-700 cursor-not-allowed bg-neutral-50 dark:bg-neutral-900/50"
+                                                                    : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                                                }`}
+                                                        >
+                                                            <span>{t}</span>
+                                                            {selectedDate && (
+                                                                <span className={`text-[9px] font-normal ${!isAvailable ? 'text-red-400' : 'text-neutral-400'}`}>
+                                                                    {!isAvailable ? "Full" : `${slotInfo.count}/${slotInfo.max} Booked`}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 bg-neutral-50 dark:bg-neutral-900 rounded-xl text-center text-sm text-neutral-500">
+                                                {selectedDate ? "No time slots available for this day." : "Please select a date first."}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 {/* Guest Contact Details (Only show if not logged in) */}

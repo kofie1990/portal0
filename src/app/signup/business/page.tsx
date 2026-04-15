@@ -37,7 +37,6 @@ const existingUserSchema = z.object({
     accountNumber: z.string().min(10, "Account number is required"),
     accountName: z.string().min(3, "Account name is required"), // Read-only but required
     // Refinement Fields
-    openingHours: z.string().optional(),
     serviceRadius: z.string().optional(),
     coverImage: z.string().min(1, "Cover image is required"),
     logo: z.string().optional(),
@@ -156,7 +155,6 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
             accountNumber: "",
             accountName: "",
             // Refinement
-            openingHours: "Mon - Fri: 9:00 AM - 5:00 PM",
             serviceRadius: "Within 10km of my location",
             coverImage: "",
             logo: "",
@@ -242,7 +240,15 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                     deposit_fee: data.depositFee || 0,
                     phone: userData.user.user_metadata?.phone || null,
                     email: userData.user.email,
-                    opening_hours: data.openingHours,
+                    time_slots: {
+                        mon: ["09:00", "12:00", "15:00"],
+                        tue: ["09:00", "12:00", "15:00"],
+                        wed: ["09:00", "12:00", "15:00"],
+                        thu: ["09:00", "12:00", "15:00"],
+                        fri: ["09:00", "12:00", "15:00"],
+                        sat: [],
+                        sun: []
+                    },
                     service_radius: data.serviceRadius,
                     cover_image_url: data.coverImage,
                     image_url: data.logo,
@@ -291,7 +297,15 @@ function BusinessWizard({ isLoggedIn }: { isLoggedIn: boolean }) {
                                 deposit_fee: data.depositFee || 0,
                                 phone: data.phone,
                                 email: data.email,
-                                opening_hours: data.openingHours,
+                                time_slots: {
+                                    mon: ["09:00", "12:00", "15:00"],
+                                    tue: ["09:00", "12:00", "15:00"],
+                                    wed: ["09:00", "12:00", "15:00"],
+                                    thu: ["09:00", "12:00", "15:00"],
+                                    fri: ["09:00", "12:00", "15:00"],
+                                    sat: [],
+                                    sun: []
+                                },
                                 service_radius: data.serviceRadius,
                                 cover_image_url: data.coverImage,
                                 image_url: data.logo,
@@ -726,22 +740,6 @@ function StepRefinement({ control, watch, setValue }: any) {
 
             {businessType === 'store' ? (
                 <div className="space-y-4">
-                    <Controller
-                        name="openingHours"
-                        control={control}
-                        render={({ field }) => (
-                            <div className="space-y-2">
-                                <label className="text-sm font-bold ml-1 flex items-center gap-2"><Clock className="w-4 h-4" /> STANDARD OPENING HOURS</label>
-                                <input
-                                    {...field}
-                                    className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
-                                    placeholder="e.g. Mon - Fri: 9am - 5pm"
-                                />
-                                <p className="text-xs text-neutral-500 ml-1">You can set detailed hours later in your dashboard.</p>
-                            </div>
-                        )}
-                    />
-
                     <Controller
                         name="coverImage"
                         control={control}

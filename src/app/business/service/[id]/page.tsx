@@ -92,7 +92,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
             {/* Cover Photo Banner */}
             <div className="w-full h-[40vh] relative mt-16">
                 <div className="absolute inset-0 bg-neutral-900/10 z-10" />
-                {vendor.coverImage && vendor.coverImage.startsWith("/") ? (
+                {vendor.coverImage && (vendor.coverImage.startsWith("/") || vendor.coverImage.startsWith("http")) ? (
                     <Image
                         src={vendor.coverImage}
                         alt="Cover"

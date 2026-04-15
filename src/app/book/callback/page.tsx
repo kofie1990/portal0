@@ -69,12 +69,12 @@ function CallbackContent() {
                         <CheckCircle className="w-8 h-8" />
                     </div>
                     <h2 className="text-2xl font-bold mb-2">Booking Confirmed!</h2>
-                    
+
                     {isGuest ? (
                         <>
                             <p className="text-neutral-500 mb-8 font-medium">A confirmation email containing your details has been sent.</p>
                             <Link href="/login">
-                                <button className="w-full py-3 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold">
+                                <button className="w-full py-3 px-10 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold">
                                     Create an account to access details
                                 </button>
                             </Link>
@@ -83,7 +83,7 @@ function CallbackContent() {
                         <>
                             <p className="text-neutral-500 mb-8">{message}</p>
                             <Link href="/account">
-                                <button className="w-full py-3 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold">
+                                <button className="w-full py-3 px-10 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold">
                                     Go to My Bookings
                                 </button>
                             </Link>

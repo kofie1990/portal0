@@ -123,6 +123,16 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
         };
     }, []);
 
+    // Clear selected item if it no longer exists in the current search results
+    useEffect(() => {
+        if (selectedItem && items) {
+            const itemStillExists = items.some(item => item.id === selectedItem.id);
+            if (!itemStillExists) {
+                setSelectedItem(null);
+            }
+        }
+    }, [items, selectedItem]);
+
     const handleMarkerClick = (item: MapItem) => {
         setMapCenter({ lat: item.lat, lng: item.lng });
         setMapZoom(16); // Zoom in closer

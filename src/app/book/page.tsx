@@ -8,7 +8,7 @@ import { ArrowLeft, Calendar, Clock, Check, CreditCard, Info, ChevronRight, User
 import Image from "next/image";
 import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/client";
-import { fetchBusinessBookings } from "@/app/actions/booking";
+import { fetchBusinessBookings, createBookingAction } from "@/app/actions/booking";
 
 function BookingContent() {
     const searchParams = useSearchParams();
@@ -48,7 +48,25 @@ function BookingContent() {
     };
 
     const dates = getAvailableDates();
-    const times = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+    
+    const getTimesForSelectedDate = () => {
+        if (!selectedDate || !vendor || !vendor.time_slots) {
+            return ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+        }
+
+        const dateObj = new Date(selectedDate);
+        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const dayStr = dayNames[dateObj.getDay()];
+
+        const slots = vendor.time_slots[dayStr];
+        if (Array.isArray(slots) && slots.length > 0) {
+            return slots;
+        }
+
+        return []; 
+    };
+
+    const times = getTimesForSelectedDate();
 
     // Booking Capacity Logic
     const [existingBookings, setExistingBookings] = useState<any[]>([]);
@@ -170,41 +188,49 @@ function BookingContent() {
         try {
             // 1. Check Auth
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                // Determine login URL (could trigger a modal or redirect)
-                // For now, alert and redirect
-                alert("Please log in to book an appointment.");
-                window.location.href = `/login?redirect=/book?businessId=${vendor.id}&service=${encodeURIComponent(selectedService.name)}`;
-                return;
+            const userId = user?.id || null;
+
+            if (!userId) {
+                if (!userDetails.name.trim() || !userDetails.phone.trim() || !userDetails.email.trim()) {
+                    alert("Please fill in all your contact details (Name, Email, Phone) to proceed.");
+                    setProcessing(false);
+                    return;
+                }
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(userDetails.email)) {
+                    alert("Please enter a valid email address.");
+                    setProcessing(false);
+                    return;
+                }
             }
 
             // Calculate Amount (Deposit or Full)
             const amountToPay = vendor.depositFee > 0 ? vendor.depositFee : selectedService.amount;
 
-            // 2. Create Booking Record
-            const { data: bookingData, error: bookingError } = await supabase
-                .from('bookings')
-                .insert({
-                    user_id: user.id,
-                    business_id: vendor.id,
-                    service_id: selectedService.id,
-                    booking_date: new Date(`${selectedDate} ${selectedTime}`).toISOString(), // Naive Date Convert
-                    status: 'pending_payment',
-                    total_amount: selectedService.amount,
-                    amount_paid: 0,
-                    notes: `Booking for ${selectedService.name} on ${selectedDate} at ${selectedTime}`,
-                })
-                .select()
-                .single();
+            // 2. Create Booking Record (Bypasses RLS for Anon via Server Action)
+            const { data: bookingData, error: bookingError } = await createBookingAction({
+                user_id: userId,
+                guest_name: userId ? null : userDetails.name.trim(),
+                guest_email: userId ? null : userDetails.email.trim().toLowerCase(),
+                guest_phone: userId ? null : userDetails.phone.trim(),
+                business_id: vendor.id,
+                provider_id: null,
+                service_id: selectedService.id,
+                booking_date: new Date(`${selectedDate} ${selectedTime}`).toISOString(), // Naive Date Convert
+                status: 'pending_payment',
+                total_amount: selectedService.amount,
+                amount_paid: 0,
+                notes: `Booking for ${selectedService.name} on ${selectedDate} at ${selectedTime}`,
+            });
 
-            if (bookingError) throw bookingError;
+            if (bookingError || !bookingData) throw new Error(bookingError || "Failed to create booking");
 
             // 3. Initialize Paystack
             const res = await fetch('/api/paystack/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: userDetails.email || user.email,
+                    email: userDetails.email.trim() || user?.email,
                     amount: amountToPay,
                     subaccount: vendor.paystack_subaccount_code,
                     metadata: {
@@ -337,33 +363,39 @@ function BookingContent() {
 
                                     <div>
                                         <h2 className="text-xl font-bold mb-4">Select Time</h2>
-                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                                            {times.map((t) => {
-                                                const slotInfo = selectedDate ? getSlotInfo(selectedDate, t) : { available: true, count: 0, max: 1 };
-                                                const isAvailable = slotInfo.available;
+                                        {times.length > 0 ? (
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                                {times.map((t: string) => {
+                                                    const slotInfo = selectedDate ? getSlotInfo(selectedDate, t) : { available: true, count: 0, max: 1 };
+                                                    const isAvailable = slotInfo.available;
 
-                                                return (
-                                                    <button
-                                                        key={t}
-                                                        disabled={!isAvailable}
-                                                        onClick={() => setSelectedTime(t)}
-                                                        className={`py-3 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${selectedTime === t
-                                                            ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
-                                                            : !isAvailable
-                                                                ? "border-neutral-100 dark:border-neutral-800 text-neutral-300 dark:text-neutral-700 cursor-not-allowed decoration-slice bg-neutral-50 dark:bg-neutral-900/50"
-                                                                : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
-                                                            }`}
-                                                    >
-                                                        <span>{t}</span>
-                                                        {selectedDate && (
-                                                            <span className={`text-[10px] font-normal ${!isAvailable ? 'text-red-400' : 'text-neutral-400'}`}>
-                                                                {!isAvailable ? "Full" : `${slotInfo.count}/${slotInfo.max} Booked`}
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
+                                                    return (
+                                                        <button
+                                                            key={t}
+                                                            disabled={!isAvailable}
+                                                            onClick={() => setSelectedTime(t)}
+                                                            className={`py-3 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${selectedTime === t
+                                                                ? "border-black dark:border-white bg-neutral-100 dark:bg-neutral-900"
+                                                                : !isAvailable
+                                                                    ? "border-neutral-100 dark:border-neutral-800 text-neutral-300 dark:text-neutral-700 cursor-not-allowed decoration-slice bg-neutral-50 dark:bg-neutral-900/50"
+                                                                    : "border-neutral-100 dark:border-neutral-800 hover:border-neutral-300"
+                                                                }`}
+                                                        >
+                                                            <span>{t}</span>
+                                                            {selectedDate && (
+                                                                <span className={`text-[10px] font-normal ${!isAvailable ? 'text-red-400' : 'text-neutral-400'}`}>
+                                                                    {!isAvailable ? "Full" : `${slotInfo.count}/${slotInfo.max} Booked`}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 bg-neutral-50 dark:bg-neutral-900 rounded-xl text-center text-sm text-neutral-500 border border-neutral-100 dark:border-neutral-800">
+                                                {selectedDate ? "No time slots available for this day." : "Please select a date first."}
+                                            </div>
+                                        )}
                                     </div>
                                 </motion.div>
                             )}
@@ -415,6 +447,16 @@ function BookingContent() {
                                                 placeholder="John Doe"
                                                 value={userDetails.name}
                                                 onChange={(e) => setUserDetails({ ...userDetails, name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold ml-1">EMAIL ADDRESS</label>
+                                            <input
+                                                type="email"
+                                                className="w-full bg-transparent border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white"
+                                                placeholder="john@example.com"
+                                                value={userDetails.email}
+                                                onChange={(e) => setUserDetails({ ...userDetails, email: e.target.value })}
                                             />
                                         </div>
                                         <div className="space-y-2">

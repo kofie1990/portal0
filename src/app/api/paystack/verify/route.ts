@@ -67,7 +67,7 @@ export async function GET(req: Request) {
             .update({
                 status: 'confirmed',
                 paystack_reference: reference,
-                amount_paid: transaction.amount / 100, // Convert back to main currency unit
+                amount_paid: transaction.metadata?.original_amount_charged || (transaction.amount / 100), // Convert back to main currency unit if fallback
                 // Optionally update metadata or notes
             })
             .eq('id', bookingId);

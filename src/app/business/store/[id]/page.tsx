@@ -10,6 +10,7 @@ import MapPlaceholder from "@/components/MapPlaceholder";
 import { notFound } from "next/navigation";
 import { use, useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import FavoriteButton from "@/components/FavoriteButton";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
@@ -173,9 +174,9 @@ export default function StorePage({ params }: { params: Promise<{ id: string }> 
                                 <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
                                     <Share2 className="w-5 h-5" />
                                 </button>
-                                <button className="p-3 rounded-full border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
-                                    <Heart className="w-5 h-5" />
-                                </button>
+                                <div className="border border-neutral-200 dark:border-neutral-800 rounded-full hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors flex items-center justify-center">
+                                    <FavoriteButton entityId={id} entityType="business" className="p-3 m-0" />
+                                </div>
                                 <Link href={`/book?businessId=${vendor.id}&type=store`} className="bg-foreground text-background px-6 py-3 rounded-full text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
                                     BOOK APPOINTMENT
                                 </Link>

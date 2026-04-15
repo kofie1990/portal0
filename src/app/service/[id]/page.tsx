@@ -5,10 +5,11 @@ import { use } from "react";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Star, MapPin, Clock, ArrowLeft, CheckCircle, Share2, Heart, Calendar } from "lucide-react";
+import { Star, MapPin, Clock, ArrowLeft, CheckCircle, Share2, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
+import FavoriteButton from "@/components/FavoriteButton";
 
 type Service = Database['public']['Tables']['services']['Row'] & {
     businesses: { id: string; name: string; location_address: string; image_url: string; rating: number } | null;
@@ -209,9 +210,9 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                                     <button className="p-3 bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-full shadow-lg hover:scale-105 transition-transform">
                                         <Share2 className="w-5 h-5 text-black dark:text-white" />
                                     </button>
-                                    <button className="p-3 bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-full shadow-lg hover:scale-105 transition-transform group">
-                                        <Heart className="w-5 h-5 text-black dark:text-white group-hover:fill-red-500 group-hover:text-red-500 transition-colors" />
-                                    </button>
+                                    <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-full shadow-lg hover:scale-105 transition-transform flex items-center justify-center">
+                                        <FavoriteButton entityId={id} entityType="service" className="p-3 m-0" />
+                                    </div>
                                 </div>
                             </div>
 

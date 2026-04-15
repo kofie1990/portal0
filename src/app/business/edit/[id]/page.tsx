@@ -4,40 +4,41 @@ import Navigation from "@/components/Navigation";
 import { useState, useEffect, use } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { notFound, useRouter } from "next/navigation";
-import { ArrowLeft, Save, Upload, MapPin, DollarSign, Store, Tag, Clock, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Upload, MapPin, DollarSign, Store, Tag, Clock, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
+
+const ALL_TIME_SLOTS = Array.from({ length: 48 }, (_, i) => { 
+    const h = Math.floor(i / 2).toString().padStart(2, '0'); 
+    const m = (i % 2 === 0 ? '00' : '30'); 
+    return `${h}:${m}`; 
+});
 
 export default function EditBusinessPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
     const supabase = createClient();
+    const { showToast } = useToast();
 
     const [loading, setLoading] = useState(true);
     const [formData, setFormData] = useState({
         name: "",
         category: "",
         bio: "",
-        location: "", // Check if this corresponds to location_type or similar in DB? assuming address or city
-        address: "", // location_address in DB likely
-        phone: "", // contact_phone?
-        email: "", // contact_email?
+        description: "",
+        bookingPolicies: "",
+        locationType: "physical",
+        address: "",
+        phone: "",
+        email: "",
         depositFee: "",
         website: "",
         instagram: "",
-        twitter: "",
-        acceptCash: true,
-        acceptMobileMoney: true,
-        autoConfirm: false,
-        hours: {
-            mon: { open: "09:00", close: "17:00", closed: false },
-            tue: { open: "09:00", close: "17:00", closed: false },
-            wed: { open: "09:00", close: "17:00", closed: false },
-            thu: { open: "09:00", close: "17:00", closed: false },
-            fri: { open: "09:00", close: "17:00", closed: false },
-            sat: { open: "10:00", close: "15:00", closed: false },
-            sun: { open: "10:00", close: "15:00", closed: true },
-        },
+        facebook: "",
+        timeSlots: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+        serviceRadius: "",
+        mapUrl: "",
         imageUrl: "",
         coverImage: ""
     });
@@ -59,31 +60,23 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
             }
 
             // Map DB columns to form state
-            // Note: Adjust column names based on your actual schema. I'm inferring from common patterns and existing code.
             setFormData({
                 name: data.name || "",
                 category: data.category || "",
-                bio: data.description || "", // 'description' is common for bio
-                location: data.location_city || "", // 'location_city' 
+                bio: data.bio || "",
+                description: data.description || "",
+                bookingPolicies: data.booking_policies || "",
+                locationType: data.location_type || "physical",
                 address: data.location_address || "",
-                phone: data.contact_phone || "",
-                email: data.contact_email || "",
-                depositFee: data.deposit_amount ? data.deposit_amount.toString() : "",
-                website: data.website_url || "",
-                instagram: data.social_instagram || "",
-                twitter: data.social_twitter || "",
-                acceptCash: data.accepted_payment_methods?.includes('cash') || false,
-                acceptMobileMoney: data.accepted_payment_methods?.includes('momo') || false,
-                autoConfirm: data.settings?.auto_confirm || false,
-                hours: data.operating_hours || {
-                    mon: { open: "09:00", close: "17:00", closed: false },
-                    tue: { open: "09:00", close: "17:00", closed: false },
-                    wed: { open: "09:00", close: "17:00", closed: false },
-                    thu: { open: "09:00", close: "17:00", closed: false },
-                    fri: { open: "09:00", close: "17:00", closed: false },
-                    sat: { open: "10:00", close: "15:00", closed: false },
-                    sun: { open: "10:00", close: "15:00", closed: true },
-                },
+                phone: data.phone || "",
+                email: data.email || "",
+                depositFee: data.deposit_fee ? data.deposit_fee.toString() : "",
+                website: data.website || "",
+                instagram: data.social_links?.instagram || "",
+                facebook: data.social_links?.facebook || "",
+                timeSlots: data.time_slots || { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+                serviceRadius: data.service_radius || "",
+                mapUrl: data.iframe_map_url || "",
                 imageUrl: data.image_url || "",
                 coverImage: data.cover_image_url || ""
             });
@@ -93,12 +86,24 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
         fetchBusiness();
     }, [id, supabase]);
 
-    const handleHourChange = (day: string, field: string, value: any) => {
+    const [expandedDay, setExpandedDay] = useState<string | null>(null);
+
+    const toggleTimeSlot = (day: string, time: string) => {
+        const currentSlots = (formData.timeSlots as any)[day] || [];
+        const isSelected = currentSlots.includes(time);
+        
+        let newSlots;
+        if (isSelected) {
+            newSlots = currentSlots.filter((t: string) => t !== time);
+        } else {
+            newSlots = [...currentSlots, time].sort();
+        }
+
         setFormData(prev => ({
             ...prev,
-            hours: {
-                ...prev.hours,
-                [day]: { ...(prev.hours as any)[day], [field]: value }
+            timeSlots: {
+                ...prev.timeSlots,
+                [day]: newSlots
             }
         }));
     };
@@ -109,25 +114,24 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
         e.preventDefault();
         setIsSaving(true);
 
-        const paymentMethods = [];
-        if (formData.acceptCash) paymentMethods.push('cash');
-        if (formData.acceptMobileMoney) paymentMethods.push('momo');
-
         const updates = {
             name: formData.name,
             category: formData.category,
-            description: formData.bio,
+            bio: formData.bio,
+            description: formData.description,
+            booking_policies: formData.bookingPolicies,
             location_address: formData.address,
-            contact_phone: formData.phone,
-            contact_email: formData.email,
-            deposit_amount: formData.depositFee ? parseFloat(formData.depositFee) : 0,
-            website_url: formData.website,
-            social_instagram: formData.instagram,
-            social_twitter: formData.twitter,
-            accepted_payment_methods: paymentMethods,
-            settings: { auto_confirm: formData.autoConfirm },
-            operating_hours: formData.hours,
-            updated_at: new Date().toISOString(),
+            phone: formData.phone,
+            email: formData.email,
+            deposit_fee: formData.depositFee ? parseFloat(formData.depositFee) : 0,
+            website: formData.website,
+            social_links: {
+                instagram: formData.instagram,
+                facebook: formData.facebook
+            },
+            time_slots: formData.timeSlots,
+            service_radius: formData.serviceRadius,
+            iframe_map_url: formData.mapUrl
         };
 
         const { error } = await supabase
@@ -137,11 +141,11 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
 
         if (error) {
             console.error("Error saving business:", error);
-            alert("Error saving changes. Please try again.");
+            showToast("Error saving changes. Please try again.", "error");
             setIsSaving(false);
         } else {
             setIsSaving(false);
-            alert("Changes saved successfully!");
+            showToast("Changes saved successfully!", "success");
             router.push(`/dashboard/${id}`);
         }
     };
@@ -248,12 +252,34 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold ml-1">BIO / DESCRIPTION</label>
-                                    <textarea
-                                        rows={4}
+                                    <label className="text-sm font-bold ml-1">TAGLINE / BIO</label>
+                                    <input
                                         value={formData.bio}
                                         onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                        placeholder="Short catchy slogan"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold ml-1">DESCRIPTION</label>
+                                    <textarea
+                                        rows={3}
+                                        value={formData.description}
+                                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                         className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white transition-colors resize-none"
+                                        placeholder="Briefly describe what your business does..."
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold ml-1">CANCELLATION & BOOKING POLICIES</label>
+                                    <textarea
+                                        rows={2}
+                                        value={formData.bookingPolicies}
+                                        onChange={(e) => setFormData({ ...formData, bookingPolicies: e.target.value })}
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white transition-colors resize-none"
+                                        placeholder="e.g. Needs 24hr notice for cancellations, no refunds on deposits..."
                                     />
                                 </div>
                             </div>
@@ -313,58 +339,81 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold ml-1">TWITTER / X</label>
+                                        <label className="text-sm font-bold ml-1">FACEBOOK</label>
                                         <input
-                                            value={formData.twitter}
-                                            onChange={(e) => setFormData({ ...formData, twitter: e.target.value })}
-                                            placeholder="@username"
+                                            value={formData.facebook}
+                                            onChange={(e) => setFormData({ ...formData, facebook: e.target.value })}
+                                            placeholder="facebook.com/username"
                                             className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white transition-colors"
                                         />
                                     </div>
                                 </div>
+
+                                <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-neutral-900">
+                                    <label className="text-sm font-bold ml-1">GOOGLE MAPS EMBED URL (Optional)</label>
+                                    <input
+                                        value={formData.mapUrl}
+                                        onChange={(e) => setFormData({ ...formData, mapUrl: e.target.value })}
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                        placeholder="<iframe src='...'>"
+                                    />
+                                    <p className="text-xs text-neutral-500 ml-1">Paste the embed code from Google Maps to show your exact location on page.</p>
+                                </div>
                             </div>
 
-                            {/* Operating Hours */}
+                            {/* Time Slots */}
                             <div className="bg-white dark:bg-black p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 space-y-6">
                                 <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <Clock className="w-5 h-5" /> Operating Hours
+                                    <Clock className="w-5 h-5" /> Booking Time Blocks
                                 </h2>
+                                 <p className="text-sm text-neutral-500">Select the specific 30-minute intervals you are available for bookings to automatically generate time slots for customers.</p>
 
-                                <div className="space-y-4">
-                                    {Object.entries(formData.hours).map(([day, schedule]: [string, any]) => (
-                                        <div key={day} className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-900 pb-4 last:border-0 last:pb-0">
-                                            <div className="w-24 font-bold uppercase text-sm">{day}</div>
-                                            <div className="flex items-center gap-4">
-                                                <label className="flex items-center gap-2 text-sm text-neutral-500 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={schedule.closed}
-                                                        onChange={(e) => handleHourChange(day, 'closed', e.target.checked)}
-                                                        className="rounded text-black focus:ring-black"
-                                                    />
-                                                    Closed
-                                                </label>
-                                                {!schedule.closed && (
-                                                    <div className="flex items-center gap-2">
-                                                        <input
-                                                            type="time"
-                                                            value={schedule.open}
-                                                            onChange={(e) => handleHourChange(day, 'open', e.target.value)}
-                                                            className="bg-neutral-100 dark:bg-neutral-900 rounded-lg px-2 py-1 text-sm outline-none border border-transparent focus:border-black dark:focus:border-white transition-colors"
-                                                        />
-                                                        <span className="text-neutral-400">-</span>
-                                                        <input
-                                                            type="time"
-                                                            value={schedule.close}
-                                                            onChange={(e) => handleHourChange(day, 'close', e.target.value)}
-                                                            className="bg-neutral-100 dark:bg-neutral-900 rounded-lg px-2 py-1 text-sm outline-none border border-transparent focus:border-black dark:focus:border-white transition-colors"
-                                                        />
+                                <div className="space-y-0 relative border border-neutral-100 dark:border-neutral-900 rounded-xl px-4">
+                                    {['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((day) => {
+                                        const isExpanded = expandedDay === day;
+                                        const daySlots = (formData.timeSlots as any)[day] || [];
+                                        return (
+                                            <div key={day} className="border-b border-neutral-100 dark:border-neutral-900 last:border-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpandedDay(isExpanded ? null : day)}
+                                                    className="w-full flex items-center justify-between py-4 font-bold uppercase text-sm hover:text-neutral-500 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <span>{day}</span>
+                                                        <span className="text-xs font-normal text-neutral-400 normal-case bg-neutral-50 dark:bg-neutral-900 px-3 py-1 rounded-full">
+                                                            {daySlots.length > 0 ? `${daySlots.length} slots matching` : 'No slots active'}
+                                                        </span>
+                                                    </div>
+                                                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                                </button>
+                                                
+                                                {isExpanded && (
+                                                    <div className="pb-6 pt-2">
+                                                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                                                            {ALL_TIME_SLOTS.map(time => {
+                                                                const isSelected = daySlots.includes(time);
+                                                                return (
+                                                                    <button
+                                                                        key={time}
+                                                                        type="button"
+                                                                        onClick={() => toggleTimeSlot(day, time)}
+                                                                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                                                                            isSelected
+                                                                                ? "bg-black text-white border-black dark:bg-white dark:text-black dark:border-white"
+                                                                                : "bg-transparent text-neutral-500 border-neutral-200 dark:border-neutral-800 hover:border-black dark:hover:border-white"
+                                                                        }`}
+                                                                    >
+                                                                        {time}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     </div>
                                                 )}
-                                                {schedule.closed && <span className="text-sm italic text-neutral-400 w-[150px] text-center">Closed all day</span>}
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -386,46 +435,15 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
                                     <p className="text-xs text-neutral-500 ml-1">Non-refundable fee charged at booking.</p>
                                 </div>
 
-                                <div className="space-y-4 pt-4 border-t border-neutral-100 dark:border-neutral-900">
-                                    <h3 className="font-bold text-sm">Payment Methods</h3>
-                                    <div className="flex gap-6">
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.acceptCash}
-                                                onChange={(e) => setFormData({ ...formData, acceptCash: e.target.checked })}
-                                                className="w-5 h-5 rounded-md border-neutral-300 text-black focus:ring-black"
-                                            />
-                                            <span className="text-sm">Cash</span>
-                                        </label>
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.acceptMobileMoney}
-                                                onChange={(e) => setFormData({ ...formData, acceptMobileMoney: e.target.checked })}
-                                                className="w-5 h-5 rounded-md border-neutral-300 text-black focus:ring-black"
-                                            />
-                                            <span className="text-sm">Mobile Money</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4 pt-4 border-t border-neutral-100 dark:border-neutral-900">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="font-bold text-sm">Auto-Confirm Bookings</h3>
-                                            <p className="text-xs text-neutral-500">Automatically accept bookings without manual approval.</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.autoConfirm}
-                                                onChange={(e) => setFormData({ ...formData, autoConfirm: e.target.checked })}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
-                                        </label>
-                                    </div>
+                                <div className="space-y-2 pt-4 border-t border-neutral-100 dark:border-neutral-900">
+                                    <label className="text-sm font-bold ml-1">SERVICE RADIUS</label>
+                                    <input
+                                        value={formData.serviceRadius}
+                                        onChange={(e) => setFormData({ ...formData, serviceRadius: e.target.value })}
+                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 outline-none focus:border-black dark:focus:border-white transition-colors"
+                                        placeholder="e.g. Within 10km of my location"
+                                    />
+                                    <p className="text-xs text-neutral-500 ml-1">Let customers know how far you're willing to travel for service.</p>
                                 </div>
                             </div>
 

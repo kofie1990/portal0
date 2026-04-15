@@ -1,3 +1,5 @@
+"use client";
+
 import { createClient } from "@/lib/supabase/client";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 import Link from "next/link";
@@ -182,6 +184,15 @@ export default function Navigation({ onSearchClick }: NavigationProps) {
                                 </Link>
                             </div>
                         </nav>
+
+                        {/* Mobile Footer */}
+                        <div className="mt-auto pb-8 pt-8 flex flex-col items-center text-xs opacity-50 gap-2 font-medium">
+                            <div className="flex gap-4">
+                                <Link href="/privacy" onClick={() => setIsMenuOpen(false)} className="hover:underline">Privacy Policy</Link>
+                                <Link href="/terms" onClick={() => setIsMenuOpen(false)} className="hover:underline">Terms of Use</Link>
+                            </div>
+                            <div>&copy; Portal 2026</div>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { BookingConfirmedEmailHtml } from '@/lib/email_templates/BookingConfirmed';
+import { BookingReminderEmailHtml } from '@/lib/email_templates/BookingReminder';
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
@@ -111,8 +112,8 @@ export async function sendBookingConfirmedEmail(bookingId: string) {
             *,
             services (name, price_amount, price_currency),
             profiles:user_id (email, full_name),
-            provider_profile:provider_id (full_name),
-            business:business_id (name, owner_id, booking_policies)
+            provider_profile:provider_id (full_name, email),
+            business:business_id (name, owner_id, booking_policies, email)
         `)
         .eq('id', bookingId)
         .single();
@@ -122,26 +123,39 @@ export async function sendBookingConfirmedEmail(bookingId: string) {
     try {
         const customerEmail = booking.profiles?.email || booking.guest_email;
         if (customerEmail) {
+            const businessNameStr = booking.business?.name || booking.provider_profile?.full_name || 'Portal';
+            const senderLocalPart = businessNameStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const senderEmailAddress = senderLocalPart ? `${senderLocalPart}@mail.myportalgh.com` : 'admin@mail.myportalgh.com';
+            const fromAddress = `${businessNameStr} <${senderEmailAddress}>`;
+            const replyToEmail = booking.business?.email || booking.provider_profile?.email;
+
+            const emailPayload: any = {
+                from: fromAddress,
+                to: [customerEmail],
+                subject: 'Booking Confirmed!',
+                html: BookingConfirmedEmailHtml({
+                    customerName: booking.profiles?.full_name || booking.guest_name || 'Customer',
+                    serviceName: booking.services?.name || 'Service',
+                    providerName: businessNameStr,
+                    date: new Date(booking.booking_date).toLocaleString(),
+                    amountPaid: `${booking.services?.price_currency || 'GH₵'} ${booking.amount_paid || 0}`,
+                    bookingUrl: `${process.env.NEXT_PUBLIC_APP_URL}/account`,
+                    bookingPolicies: booking.business?.booking_policies || null,
+                    appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://myportalgh.com'
+                })
+            };
+
+            if (replyToEmail) {
+                emailPayload.reply_to = replyToEmail;
+            }
+
             const res = await fetch('https://api.resend.com/emails', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    from: 'Portal <admin@mail.myportalgh.com>', // Use verified domain in prod
-                    to: [customerEmail],
-                    subject: 'Booking Confirmed!',
-                    html: BookingConfirmedEmailHtml({
-                        customerName: booking.profiles?.full_name || booking.guest_name || 'Customer',
-                        serviceName: booking.services?.name || 'Service',
-                        providerName: booking.business?.name || booking.provider_profile?.full_name || 'Provider',
-                        date: new Date(booking.booking_date).toLocaleString(),
-                        amountPaid: `${booking.services?.price_currency || 'GH₵'} ${booking.amount_paid || 0}`,
-                        bookingUrl: `${process.env.NEXT_PUBLIC_APP_URL}/account`,
-                        bookingPolicies: booking.business?.booking_policies || null
-                    })
-                })
+                body: JSON.stringify(emailPayload)
             });
 
             if (!res.ok) {
@@ -153,6 +167,76 @@ export async function sendBookingConfirmedEmail(bookingId: string) {
         console.error('Email sending failed', e);
     }
 
+
+    return { success: true };
+}
+
+export async function sendBookingReminderEmail(bookingId: string) {
+    const supabaseAdmin = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: booking, error } = await supabaseAdmin
+        .from('bookings')
+        .select(`
+            *,
+            services (name, price_amount, price_currency),
+            profiles:user_id (email, full_name),
+            provider_profile:provider_id (full_name, email),
+            business:business_id (name, owner_id, booking_policies, email)
+        `)
+        .eq('id', bookingId)
+        .single();
+        
+    if (error || !booking) return { error: 'Booking not found' };
+
+    try {
+        const customerEmail = booking.profiles?.email || booking.guest_email;
+        if (customerEmail) {
+            const businessNameStr = booking.business?.name || booking.provider_profile?.full_name || 'Portal';
+            const senderLocalPart = businessNameStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const senderEmailAddress = senderLocalPart ? `${senderLocalPart}@mail.myportalgh.com` : 'admin@mail.myportalgh.com';
+            const fromAddress = `${businessNameStr} <${senderEmailAddress}>`;
+            const replyToEmail = booking.business?.email || booking.provider_profile?.email;
+
+            const emailPayload: any = {
+                from: fromAddress,
+                to: [customerEmail],
+                subject: 'Reminder: Upcoming Appointment',
+                html: BookingReminderEmailHtml({
+                    customerName: booking.profiles?.full_name || booking.guest_name || 'Customer',
+                    serviceName: booking.services?.name || 'Service',
+                    providerName: businessNameStr,
+                    date: new Date(booking.booking_date).toLocaleString(),
+                    bookingUrl: `${process.env.NEXT_PUBLIC_APP_URL}/account`,
+                    appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://myportalgh.com'
+                })
+            };
+
+            if (replyToEmail) {
+                emailPayload.reply_to = replyToEmail;
+            }
+
+            const res = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(emailPayload)
+            });
+
+            if (!res.ok) {
+                const emailError = await res.json();
+                console.error('Resend Error:', emailError);
+                return { error: 'Failed to send email' };
+            }
+        }
+    } catch (e: any) {
+        console.error('Email sending failed', e);
+        return { error: 'Failed to send email' };
+    }
 
     return { success: true };
 }

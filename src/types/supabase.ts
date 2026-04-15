@@ -82,6 +82,8 @@ export interface Database {
                     is_verified: boolean | null
                     rating: number | null
                     review_count: number | null
+                    service_radius: string | null
+                    time_slots: Json | null
                 }
                 Insert: {
                     id?: string
@@ -109,6 +111,8 @@ export interface Database {
                     is_verified?: boolean | null
                     rating?: number | null
                     review_count?: number | null
+                    service_radius?: string | null
+                    time_slots?: Json | null
                 }
                 Update: {
                     id?: string
@@ -136,6 +140,8 @@ export interface Database {
                     is_verified?: boolean | null
                     rating?: number | null
                     review_count?: number | null
+                    service_radius?: string | null
+                    time_slots?: Json | null
                 }
             }
             services: {
@@ -278,6 +284,29 @@ export interface Database {
                     user_id?: string
                     rating?: number | null
                     comment?: string | null
+                }
+            }
+            favorites: {
+                Row: {
+                    id: string
+                    created_at: string
+                    user_id: string
+                    business_id: string | null
+                    service_id: string | null
+                }
+                Insert: {
+                    id?: string
+                    created_at?: string
+                    user_id: string
+                    business_id?: string | null
+                    service_id?: string | null
+                }
+                Update: {
+                    id?: string
+                    created_at?: string
+                    user_id?: string
+                    business_id?: string | null
+                    service_id?: string | null
                 }
             }
         }

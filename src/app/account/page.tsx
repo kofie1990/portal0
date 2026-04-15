@@ -3,7 +3,7 @@
 import Navigation from "@/components/Navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera, Bell, BarChart, Phone } from "lucide-react";
+import { Package, User, MapPin, CreditCard, Settings, Plus, LogOut, LayoutGrid, List, Calendar, CheckCircle, Clock, Store, Tag, Edit2, Edit3, ExternalLink, Camera, Bell, BarChart, Phone, Heart } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -12,8 +12,9 @@ import { Database } from "@/types/supabase";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import NotificationsSheet from "@/components/NotificationsSheet";
 import CalendarView from "@/components/CalendarView";
+import { useToast } from "@/components/ui/Toast";
 
-import { confirmBooking } from "@/app/actions/booking";
+import { confirmBooking, sendBookingReminderEmail } from "@/app/actions/booking";
 import FileUpload from "@/components/ui/FileUpload";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
@@ -21,14 +22,19 @@ type Service = Database['public']['Tables']['services']['Row'] & {
     businesses: { name: string } | null
 };
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
-    services: { name: string; price_amount: number; price_currency: string; image_url: string | null; images: string[] | null } | null;
+    services: { name: string; price_amount: number; price_currency: string; image_url: string | null; images: string[] | null; deposit_amount: number | null } | null;
     businesses: { name: string } | null;
     profiles: { full_name: string; avatar_url: string | null; phone: string | null } | null;
+};
+type Favorite = Database['public']['Tables']['favorites']['Row'] & {
+    businesses: { name: string, category: string, image_url: string, id: string } | null;
+    services: { name: string, price_amount: number, price_currency: string, image_url: string, id: string } | null;
 };
 
 export default function AccountPage() {
     const router = useRouter();
     const supabase = createClient();
+    const { showToast } = useToast();
 
     // Auth State
     const [isLoading, setIsLoading] = useState(true);
@@ -46,6 +52,7 @@ export default function AccountPage() {
     const [providerBookings, setProviderBookings] = useState<Booking[]>([]); // Added for calendar
     const [notifications, setNotifications] = useState<Booking[]>([]);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [myFavorites, setMyFavorites] = useState<Favorite[]>([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -55,6 +62,17 @@ export default function AccountPage() {
             const { data: bizData } = await supabase.from('businesses').select('*').eq('owner_id', user.id);
             if (bizData) setMyBusinesses(bizData);
             const businessIds = bizData?.map(b => b.id) || [];
+
+            // Fetch Favorites
+            const { data: favoritesData } = await supabase
+                .from('favorites')
+                .select(`
+                    *,
+                    businesses (id, name, category, image_url),
+                    services (id, name, price_amount, price_currency, image_url)
+                `)
+                .eq('user_id', user.id);
+            if (favoritesData) setMyFavorites(favoritesData as any);
 
             // Fetch Listings
             let listingsQuery = supabase
@@ -75,7 +93,7 @@ export default function AccountPage() {
                 .from('bookings')
                 .select(`
                     *,
-                    services (name, price_amount, price_currency, image_url, images),
+                    services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
                     profiles:profiles!provider_id (full_name, avatar_url)
                 `)
@@ -92,7 +110,7 @@ export default function AccountPage() {
                     .from('bookings')
                     .select(`
                         *,
-                        services (name, price_amount, price_currency, image_url, images),
+                        services (name, price_amount, price_currency, image_url, images, deposit_amount),
                         businesses (name),
                         profiles:profiles!user_id (full_name, avatar_url, phone)
                     `)
@@ -107,7 +125,7 @@ export default function AccountPage() {
                 .from('bookings')
                 .select(`
                     *,
-                    services (name, price_amount, price_currency, image_url, images),
+                    services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
                     profiles:profiles!user_id (full_name, avatar_url, phone)
                 `)
@@ -142,7 +160,7 @@ export default function AccountPage() {
                     .from('bookings')
                     .select(`
                     *,
-                    services (name, price_amount, price_currency, image_url, images),
+                    services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
                     profiles:profiles!user_id (full_name)
                 `)
@@ -157,7 +175,7 @@ export default function AccountPage() {
                 .from('bookings')
                 .select(`
                     *,
-                    services (name, price_amount, price_currency, image_url, images),
+                    services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
                     profiles:profiles!user_id (full_name)
                 `)
@@ -178,7 +196,7 @@ export default function AccountPage() {
                 .from('bookings')
                 .select(`
                     *,
-                    services (name, price_amount, price_currency, image_url, images),
+                    services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
                     profiles:profiles!provider_id (full_name)
                 `)
@@ -296,8 +314,10 @@ export default function AccountPage() {
 
         if (result.error) {
             console.error("Error confirming booking", result.error);
-            alert("Failed to confirm booking: " + result.error);
+            showToast("Failed to confirm booking: " + result.error, "error");
             // Revert optimistic update?
+        } else {
+            showToast("Booking confirmed successfully!", "success");
         }
     };
 
@@ -327,9 +347,19 @@ export default function AccountPage() {
         }
 
         if (!error) {
-            alert("Postpone request added to booking notes.");
+            showToast("Postpone request added to booking notes.", "success");
         } else {
             console.error("Error requesting postpone", error);
+            showToast("Failed to request postpone: " + error.message, "error");
+        }
+    };
+
+    const handleSendReminder = async (bookingId: string) => {
+        const result = await sendBookingReminderEmail(bookingId);
+        if (result.error) {
+            showToast("Failed to send reminder: " + result.error, "error");
+        } else {
+            showToast("Reminder sent successfully!", "success");
         }
     };
 
@@ -385,6 +415,12 @@ export default function AccountPage() {
                                         <User className="w-4 h-4" /> Profile
                                     </button>
                                     <div className="pt-4 pb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider px-4">Manage</div>
+                                    <button
+                                        onClick={() => setActiveTab("favorites")}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "favorites" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
+                                    >
+                                        <Heart className="w-4 h-4" /> Favorites
+                                    </button>
                                     <button
                                         onClick={() => setActiveTab("businesses")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "businesses" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
@@ -630,7 +666,9 @@ export default function AccountPage() {
                                                             );
                                                         })()}
                                                         <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30">
-                                                            <span className="text-blue-600 font-bold text-2xl block mb-1">5</span>
+                                                            <span className="text-blue-600 font-bold text-2xl block mb-1">
+                                                                {new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(myFavorites.length)}
+                                                            </span>
                                                             <span className="text-xs font-bold tracking-wider text-blue-600/70 uppercase">Favorite Providers</span>
                                                         </div>
                                                     </div>
@@ -862,7 +900,7 @@ export default function AccountPage() {
                                                                     </span>
                                                                     {booking.amount_paid && booking.amount_paid > 0 && (
                                                                         <span className="text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-1.5 py-0.5 rounded">
-                                                                            Paid {booking.services?.price_currency} {booking.amount_paid}
+                                                                            Paid {booking.services?.price_currency} {booking.services?.deposit_amount || booking.amount_paid}
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -955,7 +993,7 @@ export default function AccountPage() {
                                                             <div className="flex md:flex-col gap-2 justify-center min-w-[140px]">
                                                                 <button
                                                                     className="flex-1 px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                                                                    onClick={() => alert("Reminder sent!")}
+                                                                    onClick={() => handleSendReminder(booking.id)}
                                                                 >
                                                                     <Bell className="w-3.5 h-3.5" />
                                                                     Send Reminder
@@ -989,7 +1027,70 @@ export default function AccountPage() {
                                     </motion.div>
                                 )}
 
+                                {activeTab === "favorites" && (
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="font-heading text-2xl font-bold">My Favorites</h3>
+                                        </div>
+
+                                        {myFavorites.length === 0 ? (
+                                            <div className="text-center py-12 text-neutral-500 border border-neutral-200 dark:border-neutral-800 rounded-2xl bg-white dark:bg-black">
+                                                <Heart className="w-8 h-8 mx-auto mb-4 text-neutral-300 dark:text-neutral-700" />
+                                                <p>You haven't favorited any businesses or services yet.</p>
+                                                <Link href="/">
+                                                    <button className="mt-4 px-6 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm">Explore Providers</button>
+                                                </Link>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {myFavorites.map((fav) => {
+                                                    const isBiz = !!fav.businesses;
+                                                    const item = fav.businesses || fav.services;
+                                                    if (!item) return null;
+
+                                                    return (
+                                                        <div key={fav.id} className="bg-white dark:bg-black border border-neutral-200 dark:border-neutral-800 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                                            <div className="w-16 h-16 bg-neutral-200 rounded-xl overflow-hidden relative flex-shrink-0">
+                                                                {item.image_url ? (
+                                                                    <Image src={item.image_url} alt={item.name} fill className="object-cover" />
+                                                                ) : (
+                                                                    <div className="w-full h-full flex items-center justify-center font-bold text-neutral-400 text-xl bg-neutral-100 dark:bg-neutral-900">
+                                                                        {item.name[0]}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-heading font-bold text-base truncate">{item.name}</h4>
+                                                                <p className="text-xs text-neutral-500 truncate mb-1">
+                                                                    {isBiz ? (fav.businesses as any).category : `${(fav.services as any).price_currency || 'GH₵'} ${(fav.services as any).price_amount}`}
+                                                                </p>
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded-full inline-block">
+                                                                    {isBiz ? 'Business' : 'Service'}
+                                                                </span>
+                                                            </div>
+                                                            <Link href={isBiz ? `/business/store/${item.id}` : `/service/${item.id}`}>
+                                                                <button className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 rounded-xl text-xs font-bold transition-colors">
+                                                                    View
+                                                                </button>
+                                                            </Link>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
+
                             </div>
+                        </div>
+
+                        {/* Desktop Footer Only */}
+                        <div className="hidden md:flex flex-col items-center justify-center mt-12 pb-4 text-xs opacity-50 gap-2 font-medium">
+                            <div className="flex gap-4">
+                                <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+                                <Link href="/terms" className="hover:underline">Terms of Use</Link>
+                            </div>
+                            <div>&copy; Portal 2026</div>
                         </div>
                     </motion.div>
                 </AnimatePresence>
