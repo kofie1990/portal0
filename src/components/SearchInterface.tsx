@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, MapPin, SlidersHorizontal, ArrowRight } from "lucide-react";
 
@@ -10,9 +11,23 @@ interface SearchInterfaceProps {
     onCategoryChange: (category: string) => void;
     activeCategory: string;
     onSubmit?: () => void;
+    initialQuery?: string;
 }
 
-export default function SearchInterface({ onQueryChange, onCategoryChange, activeCategory, onSubmit }: SearchInterfaceProps) {
+export default function SearchInterface({ onQueryChange, onCategoryChange, activeCategory, onSubmit, initialQuery = "" }: SearchInterfaceProps) {
+    const [inputValue, setInputValue] = useState(initialQuery);
+
+    // Sync input value when initialQuery changes (e.g. from URL params)
+    useEffect(() => {
+        if (initialQuery) {
+            setInputValue(initialQuery);
+        }
+    }, [initialQuery]);
+
+    const handleChange = (value: string) => {
+        setInputValue(value);
+        onQueryChange(value);
+    };
 
     return (
         <div className="w-full max-w-4xl mx-auto p-0 relative z-20">
@@ -29,7 +44,8 @@ export default function SearchInterface({ onQueryChange, onCategoryChange, activ
                         <input
                             type="text"
                             placeholder="What are you looking for?"
-                            onChange={(e) => onQueryChange(e.target.value)}
+                            value={inputValue}
+                            onChange={(e) => handleChange(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && onSubmit) {
                                     onSubmit();

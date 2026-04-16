@@ -250,6 +250,18 @@ export default function AccountPage() {
         router.push("/login");
     };
 
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+            setTimeout(() => {
+                const element = document.getElementById('account-content-area');
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 50);
+        }
+    };
+
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData(e.target as HTMLFormElement);
@@ -409,46 +421,46 @@ export default function AccountPage() {
                                 </div>
                                 <nav className="space-y-1">
                                     <button
-                                        onClick={() => setActiveTab("profile")}
+                                        onClick={() => handleTabChange("profile")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "profile" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
                                         <User className="w-4 h-4" /> Profile
                                     </button>
                                     <div className="pt-4 pb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider px-4">Manage</div>
                                     <button
-                                        onClick={() => setActiveTab("favorites")}
+                                        onClick={() => handleTabChange("favorites")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "favorites" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
                                         <Heart className="w-4 h-4" /> Favorites
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab("businesses")}
+                                        onClick={() => handleTabChange("businesses")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "businesses" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
                                         <Store className="w-4 h-4" /> My Businesses
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab("listings")}
+                                        onClick={() => handleTabChange("listings")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "listings" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
                                         <Tag className="w-4 h-4" /> My Listings
                                     </button>
                                     <button
-                                        onClick={() => setActiveTab("bookings")}
+                                        onClick={() => handleTabChange("bookings")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "bookings" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
                                         <List className="w-4 h-4" /> My Bookings
                                     </button>
                                     {(myListings.length > 0 || myBusinesses.length > 0) && (
                                         <button
-                                            onClick={() => setActiveTab("client_bookings")}
+                                            onClick={() => handleTabChange("client_bookings")}
                                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "client_bookings" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                         >
                                             <User className="w-4 h-4" /> Client Bookings
                                         </button>
                                     )}
                                     <button
-                                        onClick={() => setActiveTab("calendar")}
+                                        onClick={() => handleTabChange("calendar")}
                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition-colors ${activeTab === "calendar" ? "bg-neutral-100 dark:bg-neutral-900" : "hover:bg-neutral-50 dark:hover:bg-neutral-900 text-neutral-500"}`}
                                     >
                                         <Calendar className="w-4 h-4" /> Calendar
@@ -464,7 +476,7 @@ export default function AccountPage() {
                             </div>
 
                             {/* Content Area */}
-                            <div className="md:col-span-3 space-y-6">
+                            <div id="account-content-area" className="md:col-span-3 space-y-6">
 
                                 {activeTab === "profile" && (
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>

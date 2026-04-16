@@ -87,6 +87,50 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
     const services = vendor.services || [];
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
+            {/* JSON-LD Structured Data for Google SEO */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "LocalBusiness",
+                        name: vendor.name,
+                        description: vendor.bio || `${vendor.name} — Service provider in Ghana`,
+                        address: {
+                            "@type": "PostalAddress",
+                            streetAddress: vendor.address || "",
+                            addressLocality: "Accra",
+                            addressCountry: "GH",
+                        },
+                        ...(vendor.lat && vendor.lng
+                            ? { geo: { "@type": "GeoCoordinates", latitude: vendor.lat, longitude: vendor.lng } }
+                            : {}),
+                        ...(vendor.imageUrl ? { image: vendor.imageUrl } : {}),
+                        ...(vendor.rating
+                            ? { aggregateRating: { "@type": "AggregateRating", ratingValue: vendor.rating, reviewCount: vendor.reviews || 1 } }
+                            : {}),
+                        url: `https://myportalgh.com/business/service/${id}`,
+                        ...(services.length > 0
+                            ? {
+                                hasOfferCatalog: {
+                                    "@type": "OfferCatalog",
+                                    name: "Services",
+                                    itemListElement: services.map((s: any) => ({
+                                        "@type": "Offer",
+                                        itemOffered: {
+                                            "@type": "Service",
+                                            name: s.name,
+                                            description: s.description || s.name,
+                                        },
+                                        price: s.price,
+                                        priceCurrency: "GHS",
+                                    })),
+                                },
+                            }
+                            : {}),
+                    }),
+                }}
+            />
             <Navigation />
 
             {/* Cover Photo Banner */}

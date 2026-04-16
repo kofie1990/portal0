@@ -5,9 +5,10 @@ import HeroSection from "@/components/HeroSection";
 import SearchInterface from "@/components/SearchInterface";
 import MapPlaceholder from "@/components/MapPlaceholder";
 import BusinessList from "@/components/BusinessList";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import dynamic from "next/dynamic";
 
@@ -20,10 +21,14 @@ import { createClient } from "@/lib/supabase/client";
 
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function Home() {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("All");
-  const [isSearching, setIsSearching] = useState(false);
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get("q") || "";
+  const urlCategory = searchParams.get("category") || "";
+
+  const [query, setQuery] = useState(urlQuery);
+  const [category, setCategory] = useState(urlCategory || "All");
+  const [isSearching, setIsSearching] = useState(!!urlQuery);
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [geocodedCoords, setGeocodedCoords] = useState<Record<string, { lat: number, lng: number }>>({});
 
@@ -233,6 +238,7 @@ export default function Home() {
               onCategoryChange={setCategory}
               activeCategory={category}
               onSubmit={handleSearch}
+              initialQuery={urlQuery}
             />
           </div>
         </motion.div>
@@ -246,17 +252,20 @@ export default function Home() {
             }`}
         >
           <div className="w-full h-full">
-            <InteractiveMap items={filteredBusinesses.map(b => {
-              if (b.lat && b.lng) return b;
-              if (geocodedCoords[b.id]) {
-                return {
-                  ...b,
-                  lat: geocodedCoords[b.id].lat,
-                  lng: geocodedCoords[b.id].lng
-                };
-              }
-              return null;
-            }).filter(Boolean)} />
+            <InteractiveMap
+              items={filteredBusinesses.map(b => {
+                if (b.lat && b.lng) return b;
+                if (geocodedCoords[b.id]) {
+                  return {
+                    ...b,
+                    lat: geocodedCoords[b.id].lat,
+                    lng: geocodedCoords[b.id].lng
+                  };
+                }
+                return null;
+              }).filter(Boolean)}
+              centerOnUserLocation={!!urlQuery}
+            />
           </div>
 
           {/* Overlay to close search mode (Optional UX enhancement) */}
@@ -299,5 +308,13 @@ export default function Home() {
         </AnimatePresence>
       </div>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <HomeContent />
+    </Suspense>
   );
 }

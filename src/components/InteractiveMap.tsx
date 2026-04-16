@@ -45,6 +45,7 @@ interface InteractiveMapProps {
     items: MapItem[];
     center?: { lat: number; lng: number };
     zoom?: number;
+    centerOnUserLocation?: boolean;
 }
 
 const MapController = ({ center, zoom }: { center: { lat: number, lng: number }, zoom: number }) => {
@@ -63,7 +64,7 @@ const MapEventHandler = ({ onMapClick }: { onMapClick: () => void }) => {
     return null;
 };
 
-export default function InteractiveMap({ items, center, zoom }: InteractiveMapProps) {
+export default function InteractiveMap({ items, center, zoom, centerOnUserLocation }: InteractiveMapProps) {
     // Default to Accra if no center provided
     const [mapCenter, setMapCenter] = useState(center || { lat: 5.5600, lng: -0.2057 });
     const [mapZoom, setMapZoom] = useState(zoom || 13);
@@ -86,10 +87,17 @@ export default function InteractiveMap({ items, center, zoom }: InteractiveMapPr
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    setUserLocation({
+                    const loc = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
-                    });
+                    };
+                    setUserLocation(loc);
+
+                    // If centerOnUserLocation is enabled, fly to user's position
+                    if (centerOnUserLocation) {
+                        setMapCenter(loc);
+                        setMapZoom(14);
+                    }
                 },
                 (error) => {
                     console.error("Error getting user location:", error);

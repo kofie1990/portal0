@@ -102,6 +102,43 @@ export default function ProfilePage() {
     // RENDER INDIVIDUAL PROFILE
     return (
         <main className="min-h-screen bg-background text-foreground font-sans selection:bg-neutral-200 dark:selection:bg-neutral-800">
+            {/* JSON-LD Structured Data for Google SEO */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "Person",
+                        name: profile.full_name || "Service Provider",
+                        description: profile.bio || `Service provider in Ghana`,
+                        ...(profile.location_text
+                            ? {
+                                address: {
+                                    "@type": "PostalAddress",
+                                    addressLocality: profile.location_text,
+                                    addressCountry: "GH",
+                                },
+                            }
+                            : {}),
+                        ...(profile.avatar_url ? { image: profile.avatar_url } : {}),
+                        url: `https://myportalgh.com/profile/${params.id}`,
+                        ...(services.length > 0
+                            ? {
+                                makesOffer: services.map((s: any) => ({
+                                    "@type": "Offer",
+                                    itemOffered: {
+                                        "@type": "Service",
+                                        name: s.name,
+                                        description: s.description || s.name,
+                                    },
+                                    price: s.price_amount,
+                                    priceCurrency: s.price_currency || "GHS",
+                                })),
+                            }
+                            : {}),
+                    }),
+                }}
+            />
             <Navigation />
 
             <div className="relative">
