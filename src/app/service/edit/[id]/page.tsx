@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
 import { useToast } from "@/components/ui/Toast";
+import CategorySelector from "@/components/CategorySelector";
 
 type Service = Database['public']['Tables']['services']['Row'] & {
     businesses: { id: string; name: string } | null;
@@ -446,18 +447,12 @@ export default function EditServicePage({ params }: { params: Promise<{ id: stri
                                             </div>
                                         </div>
                                         <div className="space-y-2">
-                                            <select
+                                            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider ml-1">Category</label>
+                                            <CategorySelector
                                                 value={category}
-                                                onChange={(e) => setCategory(e.target.value)}
-                                                className="w-full bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 ring-black dark:ring-white transition-all cursor-pointer appearance-none"
-                                            >
-                                                <option value="">Select Category</option>
-                                                <option value="Fashion">Fashion</option>
-                                                <option value="Food">Food</option>
-                                                <option value="Beauty">Beauty</option>
-                                                <option value="Hair">Hair</option>
-                                                {/* Add more categories as needed */}
-                                            </select>
+                                                onChange={setCategory}
+                                                className="w-full bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 ring-black dark:ring-white transition-all text-left"
+                                            />
                                         </div>
                                     </div>
 

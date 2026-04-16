@@ -12,7 +12,7 @@ import { Database } from "@/types/supabase";
 import FavoriteButton from "@/components/FavoriteButton";
 
 type Service = Database['public']['Tables']['services']['Row'] & {
-    businesses: { id: string; name: string; location_address: string; image_url: string; rating: number } | null;
+    businesses: { id: string; name: string; location_address: string; image_url: string; rating: number; location_type: string } | null;
     profiles: { id: string; full_name: string; avatar_url: string } | null;
 };
 
@@ -76,7 +76,7 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                     .from('services')
                     .select(`
                         *,
-                        businesses (id, name, location_address, image_url, rating),
+                        businesses (id, name, location_address, image_url, rating, location_type),
                         profiles (id, full_name, avatar_url)
                     `)
                     .eq('id', id)
@@ -179,6 +179,7 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
     const providerRating = service.businesses?.rating || 5.0; // Default or calculate for individual
     const providerId = service.businesses?.id || service.profiles?.id;
     const isBusiness = !!service.businesses;
+    const isStore = service.businesses?.location_type === 'physical';
 
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
@@ -325,7 +326,7 @@ export default function ServiceDetailsPage({ params }: { params: Promise<{ id: s
                                         </div>
                                     </div>
 
-                                    <Link href={isBusiness ? `/business/store/${providerId}` : `/profile/${providerId}`}>
+                                    <Link href={isBusiness ? (isStore ? `/business/store/${providerId}` : `/business/service/${providerId}`) : `/profile/${providerId}`}>
                                         <button className="w-full py-3 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
                                             View Provider Profile
                                         </button>
