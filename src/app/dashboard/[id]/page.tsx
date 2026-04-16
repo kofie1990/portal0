@@ -272,7 +272,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-black to-neutral-800 text-white rounded-2xl p-6 relative overflow-hidden">
+                        {/* <div className="bg-gradient-to-br from-black to-neutral-800 text-white rounded-2xl p-6 relative overflow-hidden">
                             <div className="relative z-10">
                                 <h3 className="font-bold text-lg mb-2">Pro Features</h3>
                                 <p className="text-neutral-300 text-sm mb-4">Upgrade to unlock advanced analytics and marketing tools.</p>
@@ -281,7 +281,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                                 </button>
                             </div>
                             <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                        </div>
+                        </div> */}
                     </div>
 
                 </div>

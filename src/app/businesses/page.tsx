@@ -28,7 +28,7 @@ export default function VendorsPage() {
                     rating: b.rating || 0,
                     reviews: b.review_count || 0,
                     image: "bg-neutral-100",
-                    imageUrl: b.image_url || b.cover_image_url,
+                    imageUrl: b.cover_image_url,
                     address: b.location_address,
                     lat: b.lat,
                     lng: b.lng,

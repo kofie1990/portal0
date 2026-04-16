@@ -2,7 +2,7 @@
 
 import Navigation from "@/components/Navigation";
 import { motion } from "framer-motion";
-import { Star, Calendar, MapPin, CheckCircle, Clock } from "lucide-react";
+import { Star, Calendar, MapPin, CheckCircle, Clock, Plus, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -23,10 +23,15 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
     const [vendor, setVendor] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { calculateDistance } = useUserLocation();
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         const fetchVendor = async () => {
             const supabase = createClient();
+            const { data: { user } } = await supabase.auth.getUser();
+            setCurrentUser(user);
+
             const { data: b, error } = await supabase
                 .from('businesses')
                 .select('*, services(*), reviews(*)')
@@ -56,6 +61,8 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                     lng: b.lng,
                     bio: b.bio,
                     openNow: b.open_now,
+                    owner_id: b.owner_id,
+                    portfolioImages: b.portfolio_images || [],
 
                     services: b.services?.map((s: any) => ({
                         id: s.id,
@@ -74,6 +81,42 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
 
         if (id) fetchVendor();
     }, [id]);
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !vendor || !currentUser || currentUser.id !== vendor.owner_id) return;
+
+        setIsUploading(true);
+        try {
+            const supabase = createClient();
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            const { error: uploadError } = await supabase.storage
+                .from('business-media')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data } = supabase.storage.from('business-media').getPublicUrl(filePath);
+            const newPortfolio = [...(vendor.portfolioImages || []), data.publicUrl];
+
+            const { error: dbError } = await supabase
+                .from('businesses')
+                .update({ portfolio_images: newPortfolio })
+                .eq('id', vendor.id);
+
+            if (dbError) throw dbError;
+
+            setVendor({ ...vendor, portfolioImages: newPortfolio });
+        } catch (error: any) {
+            console.error("Upload error:", error);
+            alert("Error uploading image: " + error.message);
+        } finally {
+            setIsUploading(false);
+        }
+    };
 
     if (isLoading) {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -229,22 +272,53 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
                                         </div>
                                         <div className="flex items-center gap-6">
                                             <span className="font-bold text-lg">{service.price}</span>
-                                            <button className="bg-neutral-100 dark:bg-neutral-800 px-4 py-2 rounded-lg text-xs font-bold hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors">
+                                            <Link href={`/service/${service.id}`} className="bg-neutral-100 dark:bg-neutral-800 px-4 py-2 rounded-lg text-xs font-bold hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition-colors">
                                                 SELECT
-                                            </button>
+                                            </Link>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
                             {/* Portfolio Grid Mockup */}
-                            <h3 className="font-heading text-2xl font-bold mb-6 mt-16 border-b border-neutral-200 dark:border-neutral-800 pb-4">Recent Work</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="aspect-square bg-neutral-200 dark:bg-neutral-800 rounded-xl"></div>
-                                <div className="aspect-square bg-neutral-200 dark:bg-neutral-800 rounded-xl"></div>
-                                <div className="aspect-square bg-neutral-200 dark:bg-neutral-800 rounded-xl"></div>
-                                <div className="aspect-square bg-neutral-200 dark:bg-neutral-800 rounded-xl"></div>
-                            </div>
+                            {(vendor.portfolioImages?.length > 0 || currentUser?.id === vendor.owner_id) && (
+                                <>
+                                    <div className="flex items-center justify-between mb-6 mt-16 border-b border-neutral-200 dark:border-neutral-800 pb-4">
+                                        <h3 className="font-heading text-2xl font-bold">Recent Work</h3>
+                                        {currentUser?.id === vendor.owner_id && (
+                                            <div>
+                                                <input
+                                                    type="file"
+                                                    id="portfolio-upload"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    onChange={handleImageUpload}
+                                                    disabled={isUploading}
+                                                />
+                                                <label
+                                                    htmlFor="portfolio-upload"
+                                                    className="cursor-pointer flex items-center gap-2 bg-neutral-100 dark:bg-neutral-800 px-4 py-2 rounded-lg text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                                                >
+                                                    {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                                                    Add Picture
+                                                </label>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {vendor.portfolioImages?.map((img: string, idx: number) => (
+                                            <div key={idx} className="aspect-square bg-neutral-100 dark:bg-neutral-900 rounded-xl overflow-hidden relative">
+                                                <Image src={img} fill alt={`Recent work ${idx + 1}`} className="object-cover" />
+                                            </div>
+                                        ))}
+                                        {(!vendor.portfolioImages || vendor.portfolioImages.length === 0) && currentUser?.id === vendor.owner_id && (
+                                            <div className="aspect-square border-2 border-dashed border-neutral-200 dark:border-neutral-800 rounded-xl flex items-center justify-center text-neutral-400 text-sm font-medium">
+                                                No pictures added yet
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
                         </motion.div>
                     </div>
                 </div>

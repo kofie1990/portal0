@@ -84,6 +84,7 @@ export interface Database {
                     review_count: number | null
                     service_radius: string | null
                     time_slots: Json | null
+                    portfolio_images: string[] | null // Added
                 }
                 Insert: {
                     id?: string
@@ -113,6 +114,7 @@ export interface Database {
                     review_count?: number | null
                     service_radius?: string | null
                     time_slots?: Json | null
+                    portfolio_images?: string[] | null // Added
                 }
                 Update: {
                     id?: string
@@ -142,6 +144,7 @@ export interface Database {
                     review_count?: number | null
                     service_radius?: string | null
                     time_slots?: Json | null
+                    portfolio_images?: string[] | null // Added
                 }
             }
             services: {
