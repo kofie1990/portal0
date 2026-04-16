@@ -132,7 +132,7 @@ export default function DashboardPage({ params }: { params: Promise<{ id: string
                         <p className="text-neutral-500">Welcome back, {vendor?.name || 'Vendor'}!</p>
                     </div>
                     <div className="flex gap-3">
-                        <Link href={`/business/${vendor.id}`} target="_blank">
+                        <Link href={vendor?.location_type === 'physical' ? `/business/store/${vendor?.id}` : `/business/service/${vendor?.id}`} target="_blank">
                             <button className="px-4 py-2 border border-neutral-200 dark:border-neutral-800 rounded-lg text-sm font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
                                 View Live Page
                             </button>

@@ -59,8 +59,17 @@ export default function AccountPage() {
             if (!user) return;
 
             // Fetch Businesses
-            const { data: bizData } = await supabase.from('businesses').select('*').eq('owner_id', user.id);
-            if (bizData) setMyBusinesses(bizData);
+            const { data: bizData } = await supabase.from('businesses').select('*, reviews(*)').eq('owner_id', user.id);
+            if (bizData) {
+                const computed = bizData.map((b: any) => {
+                    const rList = b.reviews || [];
+                    const rating = rList.length > 0
+                        ? (rList.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / rList.length).toFixed(1)
+                        : (b.rating ? Number(b.rating).toFixed(1) : "0.0");
+                    return { ...b, rating };
+                });
+                setMyBusinesses(computed as any);
+            }
             const businessIds = bizData?.map(b => b.id) || [];
 
             // Fetch Favorites
@@ -762,13 +771,16 @@ export default function AccountPage() {
                                                                 <Link href={`/dashboard/${business.id}`} className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
                                                                     <Settings className="w-3 h-3" /> Dashboard
                                                                 </Link>
+                                                                <Link href={`/business/edit/${business.id}`} className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors">
+                                                                    <Edit3 className="w-3 h-3" /> Edit Business
+                                                                </Link>
                                                                 <Link href={business.location_type === 'physical' ? `/business/store/${business.id}` : `/business/service/${business.id}`} className="flex items-center gap-1.5 px-3 py-1.5 border border-neutral-200 dark:border-neutral-800 rounded-lg text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                                                                     <ExternalLink className="w-3 h-3" /> View Live
                                                                 </Link>
                                                             </div>
                                                         </div>
                                                         <div className="text-center md:text-right p-4 bg-neutral-50 dark:bg-neutral-900 rounded-xl min-w-[120px]">
-                                                            <span className="block text-2xl font-bold">{business.rating || 0}</span>
+                                                            <span className="block text-2xl font-bold">{business.rating || "0.0"}</span>
                                                             <span className="text-xs text-neutral-500">Avg Rating</span>
                                                         </div>
                                                     </div>
