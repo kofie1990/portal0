@@ -88,21 +88,53 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "WebSite",
-              name: "Portal",
-              url: "https://myportalgh.com",
-              description: "Ghana's premier platform for finding and booking local service providers near you.",
-              potentialAction: {
-                "@type": "SearchAction",
-                target: {
-                  "@type": "EntryPoint",
-                  urlTemplate: "https://myportalgh.com/?q={search_term_string}",
+            __html: JSON.stringify([
+              {
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                name: "Portal",
+                url: "https://myportalgh.com",
+                description: "Ghana's premier platform for finding and booking local service providers near you.",
+                potentialAction: {
+                  "@type": "SearchAction",
+                  target: {
+                    "@type": "EntryPoint",
+                    urlTemplate: "https://myportalgh.com/?q={search_term_string}",
+                  },
+                  "query-input": "required name=search_term_string",
                 },
-                "query-input": "required name=search_term_string",
               },
-            }),
+              {
+                "@context": "https://schema.org",
+                "@type": "ItemList",
+                itemListElement: [
+                  {
+                    "@type": "SiteNavigationElement",
+                    position: 1,
+                    name: "Services",
+                    url: "https://myportalgh.com/services",
+                  },
+                  {
+                    "@type": "SiteNavigationElement",
+                    position: 2,
+                    name: "List Your Service",
+                    url: "https://myportalgh.com/signup/business",
+                  },
+                  {
+                    "@type": "SiteNavigationElement",
+                    position: 3,
+                    name: "Login",
+                    url: "https://myportalgh.com/login",
+                  },
+                  {
+                    "@type": "SiteNavigationElement",
+                    position: 4,
+                    name: "Sign Up",
+                    url: "https://myportalgh.com/signup",
+                  },
+                ],
+              },
+            ]),
           }}
         />
         <ToastProvider>

@@ -8,6 +8,7 @@ import { ArrowLeft, Save, Upload, MapPin, DollarSign, Store, Tag, Clock, Loader2
 import Image from "next/image";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
+import CategorySelector from "@/components/CategorySelector";
 
 const ALL_TIME_SLOTS = Array.from({ length: 48 }, (_, i) => { 
     const h = Math.floor(i / 2).toString().padStart(2, '0'); 
@@ -241,14 +242,10 @@ export default function EditBusinessPage({ params }: { params: Promise<{ id: str
 
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold ml-1">CATEGORY</label>
-                                    <div className="relative">
-                                        <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                                        <input
-                                            value={formData.category}
-                                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                            className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl pl-12 pr-4 py-4 outline-none focus:border-black dark:focus:border-white transition-colors"
-                                        />
-                                    </div>
+                                    <CategorySelector 
+                                        value={formData.category}
+                                        onChange={(val) => setFormData({ ...formData, category: val })}
+                                    />
                                 </div>
 
                                 <div className="space-y-2">

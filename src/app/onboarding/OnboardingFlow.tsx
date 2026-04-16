@@ -12,16 +12,20 @@ import { useToast } from "@/components/ui/Toast";
 import StepPayout from "./StepPayout";
 import { createSubaccountAction } from "@/app/actions/paystack";
 
-// MOCK INTERESTS
+// INTERESTS MAPPING
 const INTERESTS = [
-    { id: "barber", label: "Barbers", icon: "💈" },
-    { id: "spa", label: "Spas", icon: "🧖‍♀️" },
-    { id: "food", label: "Food", icon: "🍔" },
-    { id: "fashion", label: "Fashion", icon: "👗" },
-    { id: "fitness", label: "Fitness", icon: "🏋️‍♂️" },
-    { id: "tech", label: "Tech Repair", icon: "📱" },
-    { id: "art", label: "Art", icon: "🎨" },
-    { id: "home", label: "Home Decor", icon: "🏠" },
+    { id: "barbering", label: "Barbers", icon: "💈" },
+    { id: "spa-massage", label: "Spas", icon: "🧖‍♀️" },
+    { id: "catering", label: "Food", icon: "🍔" },
+    { id: "tailoring-fashion", label: "Fashion", icon: "👗" },
+    { id: "fitness-yoga", label: "Fitness", icon: "🏋️‍♂️" },
+    { id: "ac-refrigeration", label: "Tech Repair", icon: "📱" },
+    { id: "photography", label: "Art & Media", icon: "🎨" },
+    { id: "carpentry-furniture", label: "Home Decor", icon: "🏠" },
+    { id: "tattoo", label: "Tattoos", icon: "🖋️" },
+    { id: "lash-tech", label: "Lash Techs", icon: "👁️" },
+    { id: "makeup-artistry", label: "Makeup", icon: "💄" },
+    { id: "mechanic", label: "Auto Maint.", icon: "🔧" }
 ];
 
 export default function OnboardingFlow() {

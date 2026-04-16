@@ -3,8 +3,18 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Search, MapPin, SlidersHorizontal, ArrowRight } from "lucide-react";
+import { CATEGORY_DIVISIONS } from "@/lib/categories";
 
-const CATEGORIES = ["All", "Fashion", "Food", "Services", "Tech", "Art"];
+const CATEGORIES = ["All", ...CATEGORY_DIVISIONS.map(d => d.name)];
+
+const SHORT_NAMES: Record<string, string> = {
+    "Beauty & Personal Care": "Beauty",
+    "Home & Technical Services": "Home",
+    "Automotive": "Auto",
+    "Fashion & Craftsmanship": "Fashion",
+    "Events & Media": "Events",
+    "Lifestyle & Education": "Lifestyle",
+};
 
 interface SearchInterfaceProps {
     onQueryChange: (query: string) => void;
@@ -16,6 +26,35 @@ interface SearchInterfaceProps {
 
 export default function SearchInterface({ onQueryChange, onCategoryChange, activeCategory, onSubmit, initialQuery = "" }: SearchInterfaceProps) {
     const [inputValue, setInputValue] = useState(initialQuery);
+    const [userCity, setUserCity] = useState("Accra, GH");
+
+    // Fetch user's actual city
+    useEffect(() => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                const { latitude, longitude } = position.coords;
+                try {
+                    const response = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`,
+                        { headers: { "User-Agent": "PortalApp/1.0" } }
+                    );
+                    const data = await response.json();
+                    
+                    const address = data.address;
+                    const city = address?.city || address?.town || address?.village || address?.county;
+                    const country = address?.country_code?.toUpperCase();
+                    
+                    if (city && country) {
+                        setUserCity(`${city}, ${country}`);
+                    }
+                } catch(e) {
+                    console.error("Error fetching city:", e);
+                }
+            }, (err) => {
+                console.log("Location access denied or failed.", err);
+            });
+        }
+    }, []);
 
     // Sync input value when initialQuery changes (e.g. from URL params)
     useEffect(() => {
@@ -71,22 +110,22 @@ export default function SearchInterface({ onQueryChange, onCategoryChange, activ
                                     key={cat}
                                     onClick={() => onCategoryChange(cat)}
                                     className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${activeCategory === cat
-                                        ? "bg-foreground text-background"
-                                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                                        ? "bg-foreground text-background whitespace-nowrap"
+                                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 whitespace-nowrap"
                                         }`}
                                 >
-                                    {cat}
+                                    {SHORT_NAMES[cat] || cat}
                                 </button>
                             ))}
                         </div>
 
                         {/* Actions */}
                         <div className="flex gap-2 ml-auto">
-                            <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-sm font-medium hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors">
-                                <MapPin className="w-4 h-4" />
-                                <span>Accra, GH</span>
+                            <button className="flex justify-center items-center gap-2 px-4 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-sm font-medium hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors whitespace-nowrap overflow-hidden">
+                                <MapPin className="w-4 h-4 shrink-0" />
+                                <span className="truncate max-w-[120px] sm:max-w-none">{userCity}</span>
                             </button>
-                            <button className="p-2 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors">
+                            <button className="p-2 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors shrink-0">
                                 <SlidersHorizontal className="w-4 h-4" />
                             </button>
                         </div>

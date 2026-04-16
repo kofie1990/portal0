@@ -9,15 +9,7 @@ import { use, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Database } from "@/types/supabase";
 
-// Normalized Categories for matching
-const CATEGORY_MAP: Record<string, string[]> = {
-    "beauty": ["Beauty", "Barber", "Salon", "Makeup"],
-    "fashion": ["Fashion", "Tailor"],
-    "home": ["Home", "Cleaning", "Gardening"],
-    "fitness": ["Fitness", "Gym", "Yoga"],
-    "culinary": ["Culinary", "Food", "Catering", "Chef"],
-    "repair": ["Repair", "Tech", "Plumbing"],
-};
+import { CATEGORY_DIVISIONS } from "@/lib/categories";
 
 type Service = Database['public']['Tables']['services']['Row'] & {
     businesses: { name: string; location_address: string; rating: number } | null;
@@ -26,7 +18,9 @@ type Service = Database['public']['Tables']['services']['Row'] & {
 
 export default function ServiceCategoryPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params);
-    const categoryName = slug.charAt(0).toUpperCase() + slug.slice(1);
+    const decodedSlug = decodeURIComponent(slug);
+    const matchedDivision = CATEGORY_DIVISIONS.find(d => d.name.toLowerCase() === decodedSlug.toLowerCase());
+    const categoryName = matchedDivision ? matchedDivision.name : (decodedSlug.charAt(0).toUpperCase() + decodedSlug.slice(1));
 
     const supabase = createClient();
     const [services, setServices] = useState<Service[]>([]);
@@ -35,7 +29,9 @@ export default function ServiceCategoryPage({ params }: { params: Promise<{ slug
     useEffect(() => {
         const fetchServices = async () => {
             setLoading(true);
-            const validCategories = CATEGORY_MAP[slug.toLowerCase()] || [categoryName];
+            const validCategories = matchedDivision 
+                ? [matchedDivision.name, ...matchedDivision.categories] 
+                : [categoryName];
 
             try {
                 const { data, error } = await supabase

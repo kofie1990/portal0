@@ -7,8 +7,9 @@ import Link from "next/link";
 import { Star, ArrowUpRight, Search } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
+import { CATEGORY_DIVISIONS } from "@/lib/categories";
 
-const CATEGORIES = ["Fashion", "Beauty", "Home", "Fitness", "Culinary", "Food", "Repair", "Art", "Services"];
+const CATEGORIES = CATEGORY_DIVISIONS.map(d => d.name);
 
 export default function ServicesPage() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -83,26 +84,32 @@ export default function ServicesPage() {
                         </div>
                     ) : (
                         <div className="space-y-16">
-                            {CATEGORIES.map((category, catIndex) => {
+                            {CATEGORIES.map((categoryDivision, catIndex) => {
+                                // Find the actual division object to get its exact sub-categories
+                                const divisionObj = CATEGORY_DIVISIONS.find(d => d.name === categoryDivision);
+                                const validSubCategories = divisionObj ? divisionObj.categories : [];
+
                                 const categoryServices = services.filter(s =>
-                                    (s.category === category || (category === 'Beauty' && s.category === 'Barber')) &&
+                                    (s.category === categoryDivision || validSubCategories.includes(s.category)) &&
                                     (s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                                         s.category.toLowerCase().includes(searchQuery.toLowerCase()))
                                 );
 
                                 if (categoryServices.length === 0) return null;
 
+                                const displayServices = categoryServices.slice(0, 4);
+
                                 return (
-                                    <section key={category}>
+                                    <section key={categoryDivision}>
                                         <div className="flex items-end justify-between mb-8 border-b border-neutral-100 dark:border-neutral-900 pb-4">
-                                            <h2 className="font-heading text-2xl font-bold">{category}</h2>
-                                            <Link href={`/services/${category.toLowerCase()}`} className="text-sm font-bold text-neutral-500 hover:text-black dark:hover:text-white flex items-center gap-1">
+                                            <h2 className="font-heading text-2xl font-bold">{categoryDivision}</h2>
+                                            <Link href={`/services/${encodeURIComponent(categoryDivision.toLowerCase())}`} className="text-sm font-bold text-neutral-500 hover:text-black dark:hover:text-white flex items-center gap-1">
                                                 View All <ArrowUpRight className="w-4 h-4" />
                                             </Link>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {categoryServices.map((service, index) => (
+                                            {displayServices.map((service, index) => (
                                                 <Link href={`/service/${service.id}`} key={service.id} className="block group h-full">
                                                     <motion.div
                                                         initial={{ opacity: 0, y: 20 }}

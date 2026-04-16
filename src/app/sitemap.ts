@@ -14,25 +14,51 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 1,
     },
     {
+      url: `${baseUrl}/services`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
       url: `${baseUrl}/businesses`,
       lastModified: new Date(),
       changeFrequency: "daily",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/login`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/signup`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/signup/business`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
       priority: 0.8,
     },
   ];
 
   // Category landing pages (high priority for "near me" searches)
   const categories = [
-    "lash-tech",
-    "hair-stylist",
-    "makeup-artist",
-    "nail-tech",
-    "barber",
-    "fashion",
-    "food",
-    "services",
-    "tech",
-    "art",
+    // Beauty
+    "hair-braiding", "barbering", "makeup-artistry", "nail-tech-pedicure", "spa-massage", "skin-consultation", "tattoo", "lash-tech",
+    // Home & Technical
+    "plumbing", "electrical-engineering", "ac-refrigeration", "solar-panel", "carpentry-furniture", "painting-wallpapering", "security-cctv", "fumigation-pest",
+    // Auto
+    "mechanic", "auto-electrician", "car-detailing-wash", "vulcanizing", "ev-specialist",
+    // Fashion & Craftsmanship
+    "tailoring-fashion", "cobbler-shoe-repair", "laundry-dry-cleaning", "jewelry-goldsmithing",
+    // Events
+    "photography", "videography", "event-decor-planning", "catering", "mc-dj", "drone-pilot",
+    // Lifestyle
+    "home-tutoring", "nanny-childcare", "fitness-yoga"
   ];
 
   const categoryPages: MetadataRoute.Sitemap = categories.map((cat) => ({

@@ -16,6 +16,7 @@ import FileUpload from "@/components/ui/FileUpload";
 import { createSubaccountAction, fetchBanksAction, verifyAccountAction } from "@/app/actions/paystack";
 import { PaystackBank } from "@/lib/paystack";
 import PayoutSection from "./PayoutSection";
+import CategorySelector from "@/components/CategorySelector";
 
 // --- VALIDATION SCHEMAS ---
 
@@ -565,18 +566,10 @@ function StepDetails({ control, errors }: any) {
                     render={({ field }) => (
                         <div className="space-y-2">
                             <label className="text-sm font-bold ml-1">CATEGORY</label>
-                            <select
-                                {...field}
-                                className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none focus:border-black dark:focus:border-white transition-colors appearance-none"
-                            >
-                                <option value="">Select Category...</option>
-                                <option value="Beauty & Spa">Beauty & Spa</option>
-                                <option value="Home Services">Home Services</option>
-                                <option value="Health & Wellness">Health & Wellness</option>
-                                <option value="Events">Events</option>
-                                <option value="Automotive">Automotive</option>
-                                <option value="Other">Other</option>
-                            </select>
+                            <CategorySelector
+                                value={field.value}
+                                onChange={field.onChange}
+                            />
                             {errors.category && <p className="text-xs text-red-500 font-bold ml-1">{errors.category.message}</p>}
                         </div>
                     )}

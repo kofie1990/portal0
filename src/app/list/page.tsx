@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import Image from "next/image";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
+import CategorySelector from "@/components/CategorySelector";
 
 type Business = Database['public']['Tables']['businesses']['Row'];
 
@@ -345,19 +346,13 @@ export default function ListPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><Tag className="w-4 h-4" /> CATEGORY <span className="text-red-500">*</span></label>
-                                    <select
-                                        required
+                                    <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2">
+                                        <Tag className="w-4 h-4" /> CATEGORY <span className="text-red-500">*</span>
+                                    </label>
+                                    <CategorySelector
                                         value={category}
-                                        onChange={(e) => setCategory(e.target.value)}
-                                        className="w-full bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-5 py-4 outline-none appearance-none"
-                                    >
-                                        <option value="">Select Category</option>
-                                        <option value="Fashion">Fashion</option>
-                                        <option value="Food">Food</option>
-                                        <option value="Services">Services</option>
-                                        <option value="Art">Art</option>
-                                    </select>
+                                        onChange={setCategory}
+                                    />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-bold tracking-wide ml-1 flex items-center gap-2"><MapPin className="w-4 h-4" /> LOCATION <span className="text-red-500">*</span></label>
