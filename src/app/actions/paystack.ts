@@ -47,19 +47,20 @@ export async function createSubaccountAction(
                 business_name: businessName,
                 settlement_bank: "MOCK BANK",
                 account_number: accountNumber,
-                percentage_charge: 10,
+                percentage_charge: 0,
                 active: true
             }
         };
     }
 
     try {
-        // Enforce 10% platform fee by setting percentage_charge to 10
+        // percentage_charge is 0 because we use transaction_charge per-transaction
+        // to send the platform fee to the main account. The provider receives 100% of their fee.
         const payload: SubaccountPayload = {
             business_name: businessName,
             settlement_bank: bankCode,
             account_number: accountNumber,
-            percentage_charge: 10, // 10% Platform Fee
+            percentage_charge: 0, // Platform fee handled via transaction_charge per booking
             description: description || `Subaccount for ${businessName}`,
             primary_contact_email: email
         };

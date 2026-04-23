@@ -221,6 +221,7 @@ export interface Database {
                     paystack_reference: string | null
                     notes: string | null
                     amount_paid: number | null // Added
+                    platform_fee: number | null // Added — platform commission charged to customer
                     guest_name: string | null
                     guest_email: string | null
                     guest_phone: string | null
@@ -238,6 +239,7 @@ export interface Database {
                     paystack_reference?: string | null
                     notes?: string | null
                     amount_paid?: number | null // Added
+                    platform_fee?: number | null // Added
                     guest_name?: string | null
                     guest_email?: string | null
                     guest_phone?: string | null
@@ -255,6 +257,7 @@ export interface Database {
                     paystack_reference?: string | null
                     notes?: string | null
                     amount_paid?: number | null // Added
+                    platform_fee?: number | null // Added
                     guest_name?: string | null
                     guest_email?: string | null
                     guest_phone?: string | null

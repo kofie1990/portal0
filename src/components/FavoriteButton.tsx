@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
 
 interface FavoriteButtonProps {
     entityId: string;
@@ -12,6 +13,7 @@ interface FavoriteButtonProps {
 
 export default function FavoriteButton({ entityId, entityType, className = "" }: FavoriteButtonProps) {
     const supabase = createClient();
+    const { showToast } = useToast();
     const [isFavorited, setIsFavorited] = useState(false);
     const [count, setCount] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -57,7 +59,7 @@ export default function FavoriteButton({ entityId, entityType, className = "" }:
         e.preventDefault();
         if (!userId) {
             // Might want to alert user to log in first, but let's just ignore or prompt
-            alert("Please log in to save favorites.");
+            showToast("Please log in to save favorites.", "error");
             return;
         }
 

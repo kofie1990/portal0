@@ -171,7 +171,7 @@ export default function AccountPage() {
                     *,
                     services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
-                    profiles:profiles!user_id (full_name)
+                    profiles:profiles!user_id (full_name, phone)
                 `)
                     .neq('status', 'cancelled') // Get active ones
                     .in('business_id', businessIds);
@@ -186,7 +186,7 @@ export default function AccountPage() {
                     *,
                     services (name, price_amount, price_currency, image_url, images, deposit_amount),
                     businesses (name),
-                    profiles:profiles!user_id (full_name)
+                    profiles:profiles!user_id (full_name, phone)
                 `)
                 .neq('status', 'cancelled')
                 .eq('provider_id', user.id);
@@ -342,36 +342,43 @@ export default function AccountPage() {
         }
     };
 
-    const handlePostponeBooking = async (bookingId: string) => {
-        const newDate = prompt("Enter a proposed new date/time (e.g. 'Tomorrow at 2pm'):");
-        if (!newDate) return;
+    const handlePostponeBooking = async (bookingId: string, newDate?: string) => {
+        if (!newDate) {
+            // Legacy fallback for text-based postpone
+            const textDate = prompt("Enter a proposed new date/time (e.g. 'Tomorrow at 2pm'):");
+            if (!textDate) return;
 
-        // Just updating notes for now as a simple implementation of "Request Postpone"
-        let { error } = await supabase.rpc('append_booking_note', {
-            booking_id: bookingId,
-            note: `Postpone Requested: ${newDate}`
-        });
-
-        if (error) {
-            // Fallback if RPC doesn't exist or fails
             const { data } = await supabase.from('bookings').select('notes').eq('id', bookingId).single();
-            const updateResult = await supabase.from('bookings').update({
-                notes: (data?.notes || "") + `\n[Postpone Requested: ${newDate}]`
+            const { error } = await supabase.from('bookings').update({
+                notes: (data?.notes || "") + `\n[Postpone Requested: ${textDate}]`
             }).eq('id', bookingId);
 
-            // If fallback succeeded, clear the error
-            if (!updateResult.error) {
-                error = null;
+            if (!error) {
+                showToast("Postpone request added to booking notes.", "success");
             } else {
-                error = updateResult.error;
+                console.error("Error requesting postpone", error);
+                showToast("Failed to request postpone: " + error.message, "error");
             }
+            return;
         }
 
+        // Update the booking date directly
+        const oldBooking = notifications.find(b => b.id === bookingId) || providerBookings.find(b => b.id === bookingId);
+        const oldDateStr = oldBooking ? new Date(oldBooking.booking_date).toLocaleString() : 'unknown';
+
+        const { error } = await supabase.from('bookings').update({
+            booking_date: newDate,
+            notes: (oldBooking?.notes || "") + `\n[Postponed from ${oldDateStr} to ${new Date(newDate).toLocaleString()}]`
+        }).eq('id', bookingId);
+
         if (!error) {
-            showToast("Postpone request added to booking notes.", "success");
+            // Optimistic update
+            setNotifications(prev => prev.map(b => b.id === bookingId ? { ...b, booking_date: newDate } : b));
+            setProviderBookings(prev => prev.map(b => b.id === bookingId ? { ...b, booking_date: newDate } : b));
+            showToast("Booking rescheduled successfully!", "success");
         } else {
-            console.error("Error requesting postpone", error);
-            showToast("Failed to request postpone: " + error.message, "error");
+            console.error("Error rescheduling booking", error);
+            showToast("Failed to reschedule: " + error.message, "error");
         }
     };
 

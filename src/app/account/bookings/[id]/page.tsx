@@ -30,6 +30,7 @@ export default function BookingDetailsPage({ params }: { params: Promise<{ id: s
     const [rating, setRating] = useState(5);
     const [comment, setComment] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; action: 'complete' | 'cancel' | null }>({ isOpen: false, title: "", message: "", action: null });
 
     useEffect(() => {
         const fetchBooking = async () => {
@@ -56,19 +57,37 @@ export default function BookingDetailsPage({ params }: { params: Promise<{ id: s
         fetchBooking();
     }, [id, supabase, router]);
 
-    const handleComplete = async () => {
-        if (!confirm("Confirm that this service has been completed?")) return;
+    const handleCompletePrompt = () => setConfirmModal({ isOpen: true, title: "Complete Service", message: "Confirm that this service has been completed?", action: 'complete' });
+    const handleCancelPrompt = () => setConfirmModal({ isOpen: true, title: "Cancel Booking", message: "Are you sure you want to cancel this booking? This action cannot be undone.", action: 'cancel' });
+
+    const executeAction = async () => {
+        const action = confirmModal.action;
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        if (!action) return;
 
         setIsSubmitting(true);
-        const result = await completeBooking(id);
-        setIsSubmitting(false);
+        if (action === 'complete') {
+            const result = await completeBooking(id);
+            if (result.success) {
+                setBooking((prev: any) => ({ ...prev, status: 'completed' }));
+                showToast("Service marked as completed", "success");
+            } else {
+                showToast(result.error || "Failed text", "error");
+            }
+        } else if (action === 'cancel') {
+            const { error } = await supabase
+                .from('bookings')
+                .update({ status: 'cancelled' })
+                .eq('id', id);
 
-        if (result.success) {
-            setBooking((prev: any) => ({ ...prev, status: 'completed' }));
-            showToast("Service marked as completed", "success");
-        } else {
-            showToast(result.error || "Failed", "error");
+            if (error) {
+                showToast("Failed to cancel booking: " + error.message, "error");
+            } else {
+                setBooking((prev: any) => ({ ...prev, status: 'cancelled' }));
+                showToast("Booking cancelled successfully", "success");
+            }
         }
+        setIsSubmitting(false);
     };
 
     const handleReview = async (e: React.FormEvent) => {
@@ -119,7 +138,29 @@ export default function BookingDetailsPage({ params }: { params: Promise<{ id: s
     }] : [];
 
     return (
-        <main className="min-h-screen bg-background text-foreground font-sans">
+        <main className="min-h-screen bg-background text-foreground font-sans relative">
+            {confirmModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-8 max-w-sm w-full shadow-2xl relative">
+                        <h3 className="font-heading text-xl font-bold mb-2">{confirmModal.title}</h3>
+                        <p className="text-neutral-500 mb-6 text-sm">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                                className="flex-1 py-3 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-xl font-bold text-sm transition-colors text-black dark:text-white"
+                            >
+                                No, Go Back
+                            </button>
+                            <button
+                                onClick={executeAction}
+                                className={`flex-1 py-3 text-white rounded-xl font-bold text-sm transition-colors ${confirmModal.action === 'cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                            >
+                                Yes, Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <Navigation />
             <div className="pt-28 pb-20 container-wide max-w-4xl mx-auto px-6">
 
@@ -207,6 +248,12 @@ export default function BookingDetailsPage({ params }: { params: Promise<{ id: s
                                         <span>Amount Paid</span>
                                         <span>{booking.services?.price_currency} {booking.amount_paid || 0}</span>
                                     </div>
+                                    {booking.platform_fee > 0 && (
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-neutral-500">Platform Fee (incl.)</span>
+                                            <span>{booking.services?.price_currency} {booking.platform_fee.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-lg font-bold pt-2 border-t border-dashed border-neutral-200 dark:border-neutral-800 mt-2">
                                         <span>Total</span>
                                         <span>{booking.services?.price_currency} {booking.services?.price_amount}</span>
@@ -309,9 +356,9 @@ export default function BookingDetailsPage({ params }: { params: Promise<{ id: s
 
                             {booking.status === 'confirmed' && (
                                 <button
-                                    onClick={handleComplete}
+                                    onClick={handleCompletePrompt}
                                     disabled={isSubmitting}
-                                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 mb-3"
+                                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 mb-3 disabled:opacity-50"
                                 >
                                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4" /> Mark Completed</>}
                                 </button>
@@ -324,7 +371,11 @@ export default function BookingDetailsPage({ params }: { params: Promise<{ id: s
                             )}
 
                             {booking.status !== 'cancelled' && booking.status !== 'completed' && (
-                                <button className="w-full py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl text-sm font-bold transition-colors">
+                                <button 
+                                    onClick={handleCancelPrompt}
+                                    disabled={isSubmitting}
+                                    className="w-full py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                                >
                                     Cancel Booking
                                 </button>
                             )}

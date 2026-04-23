@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { BookingConfirmedEmailHtml } from '@/lib/email_templates/BookingConfirmed';
 import { BookingReminderEmailHtml } from '@/lib/email_templates/BookingReminder';
+import { NewBookingForProviderEmailHtml } from '@/lib/email_templates/NewBookingForProvider';
 
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
@@ -111,7 +112,7 @@ export async function sendBookingConfirmedEmail(bookingId: string) {
         .select(`
             *,
             services (name, price_amount, price_currency),
-            profiles:user_id (email, full_name),
+            profiles:user_id (email, full_name, phone),
             provider_profile:provider_id (full_name, email),
             business:business_id (name, owner_id, booking_policies, email)
         `)
@@ -164,9 +165,69 @@ export async function sendBookingConfirmedEmail(bookingId: string) {
             }
         }
     } catch (e) {
-        console.error('Email sending failed', e);
+        console.error('Customer email sending failed', e);
     }
 
+    // --- Send Provider/Business Owner Email ---
+    try {
+        const providerEmail = booking.business?.email || booking.provider_profile?.email;
+        if (providerEmail) {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://myportalgh.com';
+            const providerName = booking.business?.name || booking.provider_profile?.full_name || 'Provider';
+            const customerName = booking.profiles?.full_name || booking.guest_name || 'Customer';
+            const customerPhone = booking.profiles?.phone || booking.guest_phone || null;
+
+            // Build quick link URLs
+            const businessId = booking.business_id;
+            const dashboardUrl = businessId ? `${appUrl}/dashboard/${businessId}` : `${appUrl}/account`;
+            const calendarUrl = `${appUrl}/account`; // Calendar tab
+            const clientBookingsUrl = `${appUrl}/account`; // Client bookings tab
+            const businessPageUrl = businessId ? `${appUrl}/business/service/${businessId}` : null;
+
+            const providerEmailPayload: any = {
+                from: `Portal <admin@mail.myportalgh.com>`,
+                to: [providerEmail],
+                subject: `New Booking: ${booking.services?.name || 'Service'} — ${customerName}`,
+                html: NewBookingForProviderEmailHtml({
+                    providerName,
+                    customerName,
+                    customerPhone,
+                    serviceName: booking.services?.name || 'Service',
+                    date: new Date(booking.booking_date).toLocaleString(),
+                    amountPaid: `${booking.services?.price_currency || 'GH₵'} ${booking.amount_paid || 0}`,
+                    totalAmount: `${booking.services?.price_currency || 'GH₵'} ${booking.services?.price_amount || 0}`,
+                    bookingNotes: booking.notes || null,
+                    dashboardUrl,
+                    calendarUrl,
+                    clientBookingsUrl,
+                    businessPageUrl,
+                    appUrl,
+                })
+            };
+
+            // Set reply-to as the customer email so providers can reply directly
+            const customerReplyEmail = booking.profiles?.email || booking.guest_email;
+            if (customerReplyEmail) {
+                providerEmailPayload.reply_to = customerReplyEmail;
+            }
+
+            const providerRes = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(providerEmailPayload)
+            });
+
+            if (!providerRes.ok) {
+                const providerEmailError = await providerRes.json();
+                console.error('Provider Resend Error:', providerEmailError);
+            }
+        }
+    } catch (e) {
+        console.error('Provider email sending failed', e);
+    }
 
     return { success: true };
 }

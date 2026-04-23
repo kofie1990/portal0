@@ -7,11 +7,13 @@ import { notFound, useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Edit2, Trash2, Loader2, DollarSign, Clock, ImageIcon } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import { useToast } from "@/components/ui/Toast";
 
 export default function ManageServicesPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
     const supabase = createClient();
+    const { showToast } = useToast();
 
     const [business, setBusiness] = useState<any>(null);
     const [services, setServices] = useState<any[]>([]);
@@ -60,7 +62,7 @@ export default function ManageServicesPage({ params }: { params: Promise<{ id: s
             .eq('id', serviceId);
 
         if (error) {
-            alert("Error deleting service");
+            showToast("Error deleting service", "error");
             console.error(error);
         } else {
             setServices(services.filter(s => s.id !== serviceId));

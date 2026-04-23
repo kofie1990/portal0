@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
+import { useToast } from "@/components/ui/Toast";
 
 interface FileUploadProps {
     value?: string;
@@ -17,6 +18,7 @@ export default function FileUpload({ value, onChange, label, bucket = "business-
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const supabase = createClient();
+    const { showToast } = useToast();
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {
@@ -41,7 +43,7 @@ export default function FileUpload({ value, onChange, label, bucket = "business-
 
         } catch (error: any) {
             console.error("Error uploading file:", error);
-            alert("Error uploading file: " + error.message);
+            showToast("Error uploading file: " + error.message, "error");
         } finally {
             setUploading(false);
         }

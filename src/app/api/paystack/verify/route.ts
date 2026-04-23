@@ -68,6 +68,7 @@ export async function GET(req: Request) {
                 status: 'confirmed',
                 paystack_reference: reference,
                 amount_paid: transaction.metadata?.original_amount_charged || (transaction.amount / 100), // Convert back to main currency unit if fallback
+                platform_fee: transaction.metadata?.platform_fee || 0, // Store platform commission
                 // Optionally update metadata or notes
             })
             .eq('id', bookingId);

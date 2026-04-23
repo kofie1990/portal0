@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { use, useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useUserLocation } from "@/hooks/useUserLocation";
+import { useToast } from "@/components/ui/Toast";
 
 const InteractiveMap = dynamic(() => import("@/components/InteractiveMap"), {
     loading: () => <MapPlaceholder />,
@@ -23,6 +24,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
     const [vendor, setVendor] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { calculateDistance } = useUserLocation();
+    const { showToast } = useToast();
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [isUploading, setIsUploading] = useState(false);
 
@@ -112,7 +114,7 @@ export default function ServicePage({ params }: { params: Promise<{ id: string }
             setVendor({ ...vendor, portfolioImages: newPortfolio });
         } catch (error: any) {
             console.error("Upload error:", error);
-            alert("Error uploading image: " + error.message);
+            showToast("Error uploading image: " + error.message, "error");
         } finally {
             setIsUploading(false);
         }

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/Toast";
 import Navigation from "@/components/Navigation";
 import { createBookingAction, fetchServiceBookings } from "@/app/actions/booking";
+import { calculateTotalCharge } from "@/lib/platformFee";
 
 export default function BookingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
@@ -81,7 +82,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
         const fetchService = async () => {
             const { data, error } = await supabase
                 .from('services')
-                .select('*, businesses(name, id, time_slots), profiles(full_name, id)')
+                .select('*, businesses(name, id, time_slots, paystack_subaccount_code), profiles(full_name, id, paystack_subaccount_code)')
                 .eq('id', id)
                 .single();
 
@@ -202,6 +203,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                 status: 'pending_payment',
                 total_amount: total,
                 amount_paid: 0,
+                platform_fee: calculateTotalCharge(deposit).platformFee,
                 notes: "Booking initialized",
             });
 
@@ -209,16 +211,30 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
             const emailToUse = currentUser?.email || guestEmail.trim().toLowerCase();
 
+            // Calculate platform fee
+            const chargeInfo = calculateTotalCharge(deposit);
+            const amountToPay = chargeInfo.totalCharge;
+            const platformFeeInPesewas = Math.round(chargeInfo.platformFee * 100);
+
+            // Resolve the provider's subaccount code: business first, then profile fallback
+            const providerSubaccount = service.businesses?.paystack_subaccount_code
+                || service.profiles?.paystack_subaccount_code
+                || null;
+
             // 2. Initialize Paystack
+            // transaction_charge tells Paystack how much (in pesewas) goes to the platform.
+            // The rest goes to the provider's subaccount.
             const res = await fetch('/api/paystack/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     email: emailToUse,
-                    amount: deposit, // Paystack expects amount in main currency if logic in API handles *100.
+                    amount: amountToPay,
+                    subaccount: providerSubaccount,
+                    transaction_charge: platformFeeInPesewas,
                     metadata: {
                         booking_id: bookingData.id,
-                        vendorId: service.business_id || service.profile_id, // For split payments if needed
+                        vendorId: service.business_id || service.profile_id,
                         custom_fields: [
                             {
                                 display_name: "Service",
@@ -261,6 +277,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
     const depositAmount = service.deposit_amount || 0;
     const remainingAmount = service.price_amount - depositAmount;
+    const chargeBreakdown = calculateTotalCharge(depositAmount);
 
     return (
         <main className="min-h-screen bg-background text-foreground font-sans">
@@ -421,8 +438,12 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                                         <span className="font-medium">GH₵{service.price_amount.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm text-green-600 font-bold">
-                                        <span>Deposit Required (Now)</span>
+                                        <span>Booking Fee (Now)</span>
                                         <span>GH₵{depositAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-neutral-500">Platform Fee</span>
+                                        <span className="font-medium">GH₵{chargeBreakdown.platformFee.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-sm text-neutral-400">
                                         <span>Due after service</span>
@@ -432,7 +453,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
 
                                 <div className="flex justify-between items-center text-lg font-bold">
                                     <span>Total to Pay Now</span>
-                                    <span>GH₵{depositAmount.toFixed(2)}</span>
+                                    <span>GH₵{chargeBreakdown.totalCharge.toFixed(2)}</span>
                                 </div>
 
                                 <button
@@ -443,7 +464,7 @@ export default function BookingPage({ params }: { params: Promise<{ id: string }
                                     {isBooking ? (
                                         <Loader2 className="animate-spin w-5 h-5" />
                                     ) : (
-                                        <>PAY DEPOSIT & BOOK</>
+                                        <>PAY GH₵{chargeBreakdown.totalCharge.toFixed(2)} & BOOK</>
                                     )}
                                 </button>
                                 <p className="text-xs text-center text-neutral-400">By booking, you agree to our Terms of Service.</p>

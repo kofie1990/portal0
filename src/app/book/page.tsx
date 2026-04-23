@@ -9,10 +9,13 @@ import Image from "next/image";
 import { MOCK_BUSINESSES } from "@/lib/mock-data";
 import { createClient } from "@/lib/supabase/client";
 import { fetchBusinessBookings, createBookingAction } from "@/app/actions/booking";
+import { useToast } from "@/components/ui/Toast";
+import { calculateTotalCharge } from "@/lib/platformFee";
 
 function BookingContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { showToast } = useToast();
     const businessId = searchParams.get("businessId") || searchParams.get("vendorId");
     const serviceName = searchParams.get('service');
 
@@ -183,6 +186,10 @@ function BookingContent() {
 
 
 
+    // Platform fee calculation for display
+    const bookingFee = vendor.depositFee > 0 ? vendor.depositFee : selectedService?.amount || 0;
+    const chargeBreakdown = calculateTotalCharge(bookingFee);
+
     const handlePayment = async () => {
         setProcessing(true);
         try {
@@ -192,20 +199,21 @@ function BookingContent() {
 
             if (!userId) {
                 if (!userDetails.name.trim() || !userDetails.phone.trim() || !userDetails.email.trim()) {
-                    alert("Please fill in all your contact details (Name, Email, Phone) to proceed.");
+                    showToast("Please fill in all your contact details (Name, Email, Phone) to proceed.", "error");
                     setProcessing(false);
                     return;
                 }
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!emailRegex.test(userDetails.email)) {
-                    alert("Please enter a valid email address.");
+                    showToast("Please enter a valid email address.", "error");
                     setProcessing(false);
                     return;
                 }
             }
 
-            // Calculate Amount (Deposit or Full)
-            const amountToPay = vendor.depositFee > 0 ? vendor.depositFee : selectedService.amount;
+            // Calculate Amount (Deposit or Full) + Platform Fee
+            const amountToPay = chargeBreakdown.totalCharge;
+            const platformFeeInPesewas = Math.round(chargeBreakdown.platformFee * 100);
 
             // 2. Create Booking Record (Bypasses RLS for Anon via Server Action)
             const { data: bookingData, error: bookingError } = await createBookingAction({
@@ -220,12 +228,15 @@ function BookingContent() {
                 status: 'pending_payment',
                 total_amount: selectedService.amount,
                 amount_paid: 0,
+                platform_fee: chargeBreakdown.platformFee,
                 notes: `Booking for ${selectedService.name} on ${selectedDate} at ${selectedTime}`,
             });
 
             if (bookingError || !bookingData) throw new Error(bookingError || "Failed to create booking");
 
             // 3. Initialize Paystack
+            // transaction_charge tells Paystack how much (in pesewas) goes to the main/platform account.
+            // The rest goes to the provider's subaccount.
             const res = await fetch('/api/paystack/initialize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -233,6 +244,7 @@ function BookingContent() {
                     email: userDetails.email.trim() || user?.email,
                     amount: amountToPay,
                     subaccount: vendor.paystack_subaccount_code,
+                    transaction_charge: platformFeeInPesewas,
                     metadata: {
                         booking_id: bookingData.id, // Important for callback
                         vendorId: vendor.id,
@@ -251,12 +263,12 @@ function BookingContent() {
             if (res.ok && data.authorization_url) {
                 window.location.href = data.authorization_url;
             } else {
-                alert(`Payment initialization failed: ${data.error || "Unknown error"}`);
+                showToast(`Payment initialization failed: ${data.error || "Unknown error"}`, "error");
                 setProcessing(false);
             }
         } catch (e: any) {
             console.error(e);
-            alert(`An error occurred: ${e.message}`);
+            showToast(`An error occurred: ${e.message}`, "error");
             setProcessing(false);
         }
     };
@@ -423,10 +435,10 @@ function BookingContent() {
                                             <span className="text-neutral-500">Time</span>
                                             <span className="font-bold">{selectedTime}</span>
                                         </div>
-                                        {vendor.depositFee && (
-                                            <div className="flex justify-between items-center pt-2">
+                                        {vendor.depositFee > 0 && (
+                                            <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-4">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-neutral-500">Deposit Fee</span>
+                                                    <span className="text-neutral-500">Booking Fee</span>
                                                     <div className="group relative">
                                                         <Info className="w-4 h-4 text-neutral-400 cursor-help" />
                                                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center z-10">
@@ -434,9 +446,25 @@ function BookingContent() {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <span className="font-bold text-foreground">GH₵ {vendor.depositFee}</span>
+                                                <span className="font-bold text-foreground">GH₵ {vendor.depositFee.toFixed(2)}</span>
                                             </div>
                                         )}
+                                        <div className="flex justify-between items-center border-b border-neutral-200 dark:border-neutral-800 pb-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-neutral-500">Platform Fee</span>
+                                                <div className="group relative">
+                                                    <Info className="w-4 h-4 text-neutral-400 cursor-help" />
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-black text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center z-10">
+                                                        {vendor.depositFee > 0 ? '10% service fee on your booking' : 'Flat service fee for this booking'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span className="font-bold text-foreground">GH₵ {chargeBreakdown.platformFee.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pt-2">
+                                            <span className="font-bold text-lg">Total to Pay</span>
+                                            <span className="font-bold text-lg">GH₵ {chargeBreakdown.totalCharge.toFixed(2)}</span>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-4">
@@ -494,7 +522,7 @@ function BookingContent() {
                                     : "hover:scale-105"
                                     }`}
                             >
-                                {processing ? "PROCESSING..." : step === 3 ? (vendor.depositFee ? "PAY DEPOSIT & BOOK" : "CONFIRM BOOKING") : "CONTINUE"}
+                                {processing ? "PROCESSING..." : step === 3 ? `PAY GH₵ ${chargeBreakdown.totalCharge.toFixed(2)} & BOOK` : "CONTINUE"}
                                 {step < 3 && !processing && <ChevronRight className="w-4 h-4" />}
                             </button>
                         </div>
