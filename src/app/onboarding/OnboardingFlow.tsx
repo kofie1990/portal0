@@ -41,6 +41,7 @@ export default function OnboardingFlow() {
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
     // Profile State
+    const [phone, setPhone] = useState("");
     const [bio, setBio] = useState("");
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
     const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -102,10 +103,16 @@ export default function OnboardingFlow() {
                 onboarding_completed: true,
                 interests: selectedInterests,
                 bio: bio,
+                phone: phone,
                 location_text: location,
                 lat: lat,
                 lng: lng,
             };
+
+            // Update Auth User Metadata
+            await supabase.auth.updateUser({
+                data: { phone: phone }
+            });
 
             if (uploadedAvatarUrl) {
                 updates.avatar_url = uploadedAvatarUrl;
@@ -181,6 +188,8 @@ export default function OnboardingFlow() {
                         {step === 2 && (
                             <StepProfile
                                 key="profile"
+                                phone={phone}
+                                setPhone={setPhone}
                                 bio={bio}
                                 setBio={setBio}
                                 avatarPreview={avatarPreview}
@@ -286,7 +295,7 @@ function StepLocation({ location, setLocation, setLat, setLng, onNext, onBack }:
     );
 }
 
-function StepProfile({ bio, setBio, avatarPreview, handleFileChange, onNext, onBack }: any) {
+function StepProfile({ phone, setPhone, bio, setBio, avatarPreview, handleFileChange, onNext, onBack }: any) {
     return (
         <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -315,6 +324,17 @@ function StepProfile({ bio, setBio, avatarPreview, handleFileChange, onNext, onB
             </div>
 
             <div className="space-y-4 mb-10">
+                <div className="space-y-2">
+                    <label className="text-sm font-bold tracking-wide ml-1 text-neutral-500">PHONE NUMBER</label>
+                    <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g. 0241234567"
+                        className="w-full bg-neutral-100 dark:bg-neutral-900 border-none px-4 py-4 rounded-xl text-base font-medium outline-none focus:ring-2 ring-black dark:ring-white transition-all"
+                    />
+                </div>
+
                 <div className="space-y-2">
                     <label className="text-sm font-bold tracking-wide ml-1 text-neutral-500">SHORT BIO</label>
                     <textarea
