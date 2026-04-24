@@ -109,6 +109,9 @@ function HomeContent() {
           // If still no location, exclude from map
           if (!finalLat || !finalLng) return null;
 
+          // Exclude profiles without any services
+          if (!p.services || p.services.length === 0) return null;
+
           return {
             id: p.id,
             name: p.full_name || "Unnamed User",

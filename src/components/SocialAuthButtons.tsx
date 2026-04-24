@@ -25,8 +25,28 @@ interface SocialAuthButtonsProps {
 export default function SocialAuthButtons({ redirectTo, className = "" }: SocialAuthButtonsProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [isScriptReady, setIsScriptReady] = useState(false);
+    const [useFallback, setUseFallback] = useState(false);
     const router = useRouter();
     const buttonContainerRef = useRef<HTMLDivElement>(null);
+
+    // Standard Supabase OAuth fallback for restrictive in-app browsers
+    const handleFallbackLogin = async () => {
+        setIsLoading(true);
+        const supabase = createClient();
+        const callbackUrl = `${window.location.origin}/auth/callback${redirectTo ? `?next=${encodeURIComponent(redirectTo)}` : ""}`;
+
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+                redirectTo: callbackUrl,
+            },
+        });
+
+        if (error) {
+            console.error("OAuth error:", error.message);
+            setIsLoading(false);
+        }
+    };
 
     const handleGoogleResponse = async (response: any) => {
         setIsLoading(true);
@@ -40,7 +60,6 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
             console.error("Supabase Auth Error:", error.message);
             setIsLoading(false);
         } else if (data.user) {
-            // Success! Redirect based on onboarding status
             const { data: profile } = await supabase
                 .from("profiles")
                 .select("onboarding_completed")
@@ -68,7 +87,7 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
             callback: handleGoogleResponse,
             context: "use",
             ux_mode: "popup",
-            auto_select: false, // Prevents auto-select errors on load
+            auto_select: false,
         });
 
         google.accounts.id.renderButton(
@@ -76,14 +95,13 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
             {
                 theme: "outline",
                 size: "large",
-                shape: "pill", // Matches the precision UI
+                shape: "pill",
                 text: "continue_with",
-                logo_alignment: "left", // 'left' looks much better for wide buttons to keep text centered
-                width: Math.min(containerWidth, 400) // Dynamically match container width
+                logo_alignment: "left",
+                width: Math.min(containerWidth, 400)
             }
         );
 
-        // Try to show One Tap prompt, swallow the AbortError if user closes it
         try {
             google.accounts.id.prompt();
         } catch (e) {
@@ -94,10 +112,16 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
     };
 
     useEffect(() => {
-        // Since we load the script via layout.tsx with beforeInteractive,
-        // it should be ready very fast. We'll check immediately, then poll just in case.
-        let checkInterval: NodeJS.Timeout;
+        // Detect in-app browsers that block external scripts/popups (Snapchat, Instagram, TikTok, Facebook)
+        const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
+        const isInAppBrowser = /Snapchat|Instagram|FBAV|FBAN|TikTok|Bytedance/i.test(ua);
+        
+        if (isInAppBrowser) {
+            setUseFallback(true);
+            return;
+        }
 
+        let checkInterval: NodeJS.Timeout;
         const checkGoogle = () => {
             if (typeof window !== "undefined" && (window as any).google && buttonContainerRef.current) {
                 initializeGoogle();
@@ -105,11 +129,18 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
             }
         };
 
-        checkGoogle(); // Check immediately
+        checkGoogle();
 
         if (!((window as any)?.google)) {
-            // Poll every 100ms if not ready yet
             checkInterval = setInterval(checkGoogle, 100);
+            
+            // If it takes more than 3 seconds, assume the script is blocked and use fallback
+            setTimeout(() => {
+                if (!((window as any)?.google)) {
+                    setUseFallback(true);
+                    clearInterval(checkInterval);
+                }
+            }, 3000);
         }
 
         return () => {
@@ -127,9 +158,17 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
                     </svg>
                     <span className="font-bold tracking-wide">CONNECTING...</span>
                 </div>
+            ) : useFallback ? (
+                <button
+                    onClick={handleFallbackLogin}
+                    disabled={isLoading}
+                    className="group w-full flex items-center justify-center gap-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-full px-5 h-[44px] font-medium text-sm text-[#3c4043] dark:text-neutral-200 tracking-wide hover:border-neutral-400 dark:hover:border-neutral-500 hover:shadow-md transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
+                >
+                    <GoogleIcon className="w-5 h-5" />
+                    <span className="font-roboto font-medium">Continue with Google</span>
+                </button>
             ) : (
                 <div className="w-full flex justify-center min-h-[44px] relative">
-                    {/* Placeholder while Google script is initializing */}
                     {!isScriptReady && (
                         <div className="absolute inset-0 flex justify-center pointer-events-none opacity-50">
                              <div className="w-full max-w-[400px] flex items-center justify-center gap-3 bg-white border border-[#dadce0] rounded-full px-5 h-[44px] font-medium text-sm text-[#3c4043] tracking-wide">
@@ -138,7 +177,6 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
                             </div>
                         </div>
                     )}
-                    {/* Real Google Button Container */}
                     <div ref={buttonContainerRef} className={`w-full flex justify-center transition-opacity duration-300 ${isScriptReady ? 'opacity-100' : 'opacity-0'}`}></div>
                 </div>
             )}
