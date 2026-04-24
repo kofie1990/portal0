@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Outfit, Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -81,6 +82,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Load Google Auth SDK immediately on initial HTML response to eliminate delay */}
+        <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
+      </head>
       <body
         className={`${outfit.variable} ${inter.variable} antialiased`}
       >
