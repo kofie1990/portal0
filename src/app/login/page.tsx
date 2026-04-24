@@ -5,6 +5,7 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Lock, Mail } from "lucide-react";
 import Link from "next/link";
+import SocialAuthButtons from "@/components/SocialAuthButtons";
 
 function LoginContent() {
     const router = useRouter();
@@ -67,6 +68,7 @@ function LoginContent() {
                 </div>
 
                 <div className="glass-panel p-8 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white/50 dark:bg-black/50">
+                    <SocialAuthButtons redirectTo={redirectPath} className="mb-2" />
                     <form onSubmit={handleLogin} className="space-y-6">
                         {error && (
                             <div className="p-3 bg-red-100 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">

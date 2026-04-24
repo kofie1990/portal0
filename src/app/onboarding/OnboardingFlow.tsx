@@ -4,7 +4,7 @@ import Navigation from "@/components/Navigation";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Check, MapPin, Sparkles, Camera, Upload } from "lucide-react";
+import { ArrowRight, Check, MapPin, Camera, Upload } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import LocationAutocomplete from "@/components/LocationAutocomplete";
@@ -230,8 +230,8 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
             exit={{ opacity: 0, y: -20 }}
             className="text-center"
         >
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-black dark:bg-white rounded-3xl mb-8 shadow-2xl">
-                <Sparkles className="w-10 h-10 text-white dark:text-black" />
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-black dark:bg-white rounded-3xl mb-8 shadow-2xl overflow-hidden">
+                <Image src="/portal_logo.png" alt="Portal logo" width={48} height={48} className="invert dark:invert-0" />
             </div>
             <h1 className="font-heading text-5xl font-bold mb-6">Welcome to Portal.</h1>
             <p className="text-xl text-neutral-500 mb-12 max-w-md mx-auto">

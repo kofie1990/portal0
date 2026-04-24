@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Lock, Mail, User, Smartphone, Check } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import SocialAuthButtons from "@/components/SocialAuthButtons";
 
 export default function SignupPage() {
     const router = useRouter();
@@ -77,6 +78,7 @@ export default function SignupPage() {
                     </div>
 
                     <div className="glass-panel p-8 rounded-3xl border border-neutral-200 dark:border-neutral-800 shadow-2xl bg-white/50 dark:bg-black/50">
+                        <SocialAuthButtons className="mb-2" />
                         <form onSubmit={handleSignup} className="space-y-6">
                             {error && (
                                 <div className="p-3 bg-red-100 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">
@@ -159,9 +161,9 @@ export default function SignupPage() {
                     <p className="text-center mt-8 text-sm text-neutral-500">
                         Already have an account? <Link href="/login" className="font-bold text-foreground hover:underline">Sign In</Link>
                     </p>
-                    <p className="text-center mt-2 text-sm text-neutral-500">
+                    {/* <p className="text-center mt-2 text-sm text-neutral-500">
                         Are you a business? <Link href="/signup/business" className="font-bold text-foreground hover:underline">Register Business</Link>
-                    </p>
+                    </p> */}
                 </div>
             </div>
         </main>

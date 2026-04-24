@@ -8,7 +8,7 @@ import BusinessList from "@/components/BusinessList";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import dynamic from "next/dynamic";
 
@@ -21,7 +21,9 @@ import { createClient } from "@/lib/supabase/client";
 
 import { motion, AnimatePresence } from "framer-motion";
 
+
 function HomeContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get("q") || "";
   const urlCategory = searchParams.get("category") || "";
@@ -31,6 +33,18 @@ function HomeContent() {
   const [isSearching, setIsSearching] = useState(!!urlQuery);
   const [businesses, setBusinesses] = useState<any[]>([]);
   const [geocodedCoords, setGeocodedCoords] = useState<Record<string, { lat: number, lng: number }>>({});
+
+  // Redirect logged-in users to /account
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        router.replace("/account");
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   // Fetch real data
 
