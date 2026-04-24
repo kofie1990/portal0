@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/account", "/dashboard", "/onboarding", "/api/"],
+        disallow: ["/account", "/dashboard", "/onboarding", "/api/", "/login", "/signup"],
       },
     ],
     sitemap: "https://myportalgh.com/sitemap.xml",

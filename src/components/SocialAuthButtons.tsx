@@ -89,7 +89,7 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
             {/* Load Google SDK safely with Next.js */}
             <Script
                 src="https://accounts.google.com/gsi/client"
-                strategy="lazyOnload"
+                strategy="afterInteractive"
                 onLoad={initializeGoogle}
             />
 
