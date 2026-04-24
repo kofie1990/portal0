@@ -26,6 +26,7 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
     const [isLoading, setIsLoading] = useState(false);
     const [isScriptReady, setIsScriptReady] = useState(false);
     const [useFallback, setUseFallback] = useState(false);
+    const [isInAppBrowser, setIsInAppBrowser] = useState(false);
     const router = useRouter();
     const buttonContainerRef = useRef<HTMLDivElement>(null);
 
@@ -114,9 +115,10 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
     useEffect(() => {
         // Detect in-app browsers that block external scripts/popups (Snapchat, Instagram, TikTok, Facebook)
         const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
-        const isInAppBrowser = /Snapchat|Instagram|FBAV|FBAN|TikTok|Bytedance/i.test(ua);
+        const inApp = /Snapchat|Instagram|FBAV|FBAN|TikTok|Bytedance/i.test(ua);
         
-        if (isInAppBrowser) {
+        if (inApp) {
+            setIsInAppBrowser(true);
             setUseFallback(true);
             return;
         }
@@ -159,14 +161,24 @@ export default function SocialAuthButtons({ redirectTo, className = "" }: Social
                     <span className="font-bold tracking-wide">CONNECTING...</span>
                 </div>
             ) : useFallback ? (
-                <button
-                    onClick={handleFallbackLogin}
-                    disabled={isLoading}
-                    className="group w-full flex items-center justify-center gap-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-full px-5 h-[44px] font-medium text-sm text-[#3c4043] dark:text-neutral-200 tracking-wide hover:border-neutral-400 dark:hover:border-neutral-500 hover:shadow-md transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
-                >
-                    <GoogleIcon className="w-5 h-5" />
-                    <span className="font-roboto font-medium">Continue with Google</span>
-                </button>
+                <div className="w-full flex flex-col items-center gap-3">
+                    {isInAppBrowser && (
+                        <div className="w-full p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-2xl text-center shadow-sm">
+                            <p className="text-xs font-medium text-red-800 dark:text-red-300 leading-relaxed">
+                                Google Sign-In is blocked by this app's browser.<br/>
+                                <span className="font-bold mt-1 block">Tap the menu (•••) above and select<br/>"Open in Browser" to continue.</span>
+                            </p>
+                        </div>
+                    )}
+                    <button
+                        onClick={isInAppBrowser ? () => alert("Please tap the menu above and select 'Open in Browser' to sign in with Google.") : handleFallbackLogin}
+                        disabled={isLoading}
+                        className={`group w-full flex items-center justify-center gap-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-full px-5 h-[44px] font-medium text-sm text-[#3c4043] dark:text-neutral-200 tracking-wide hover:border-neutral-400 dark:hover:border-neutral-500 hover:shadow-md transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none ${isInAppBrowser ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <GoogleIcon className="w-5 h-5" />
+                        <span className="font-roboto font-medium">Continue with Google</span>
+                    </button>
+                </div>
             ) : (
                 <div className="w-full flex justify-center min-h-[44px] relative">
                     {!isScriptReady && (
