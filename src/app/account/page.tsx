@@ -744,10 +744,8 @@ export default function AccountPage() {
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                                         <div className="flex justify-between items-center mb-6">
                                             <h3 className="font-heading text-2xl font-bold">My Businesses</h3>
-                                            <Link href="/signup/business">
-                                                <button className="flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-bold tracking-wide hover:opacity-90">
-                                                    <Plus className="w-4 h-4" /> Add New
-                                                </button>
+                                            <Link href="/signup/business" className="flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-bold tracking-wide hover:opacity-90">
+                                                <Plus className="w-4 h-4" /> Add New
                                             </Link>
                                         </div>
 
@@ -801,10 +799,8 @@ export default function AccountPage() {
                                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
                                         <div className="flex justify-between items-center mb-6">
                                             <h3 className="font-heading text-2xl font-bold">My Listings</h3>
-                                            <Link href="/list">
-                                                <button className="flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-bold tracking-wide hover:opacity-90">
-                                                    <Plus className="w-4 h-4" /> Create Listing
-                                                </button>
+                                            <Link href="/list" className="flex items-center gap-2 bg-foreground text-background px-4 py-2 rounded-lg text-sm font-bold tracking-wide hover:opacity-90">
+                                                <Plus className="w-4 h-4" /> Create Listing
                                             </Link>
                                         </div>
 
@@ -833,15 +829,11 @@ export default function AccountPage() {
                                                             </p>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <Link href={`/account/listings/${service.id}/analytics`}>
-                                                                <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20" title="Analytics">
-                                                                    <BarChart className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
-                                                                </button>
+                                                            <Link href={`/account/listings/${service.id}/analytics`} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20 block" title="Analytics">
+                                                                <BarChart className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
                                                             </Link>
-                                                            <Link href={`/service/edit/${service.id}`}>
-                                                                <button className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20" title="Edit">
-                                                                    <Edit3 className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
-                                                                </button>
+                                                            <Link href={`/service/edit/${service.id}`} className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-full transition-colors relative z-20 block" title="Edit">
+                                                                <Edit3 className="w-4 h-4 text-neutral-500 hover:text-black dark:hover:text-white" />
                                                             </Link>
                                                         </div>
                                                     </div>
@@ -861,8 +853,8 @@ export default function AccountPage() {
                                             {myBookings.length === 0 ? (
                                                 <div className="text-center py-12 text-neutral-500">
                                                     <p>You haven't made any bookings yet.</p>
-                                                    <Link href="/">
-                                                        <button className="mt-4 px-6 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm">Browse Services</button>
+                                                    <Link href="/" className="mt-4 px-6 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm inline-block">
+                                                        Browse Services
                                                     </Link>
                                                 </div>
                                             ) : (
@@ -948,17 +940,13 @@ export default function AccountPage() {
                                                                     >
                                                                         Cancel
                                                                     </button>
-                                                                    <Link href={`/account/bookings/${booking.id}`} className="w-full">
-                                                                        <button className="w-full px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm">
-                                                                            View Details
-                                                                        </button>
+                                                                    <Link href={`/account/bookings/${booking.id}`} className="w-full px-4 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity shadow-sm block text-center">
+                                                                        View Details
                                                                     </Link>
                                                                 </>
                                                             ) : (
-                                                                <Link href={`/account/bookings/${booking.id}`} className="col-span-2">
-                                                                    <button className="w-full px-4 py-2.5 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors">
-                                                                        View Details
-                                                                    </button>
+                                                                <Link href={`/account/bookings/${booking.id}`} className="col-span-2 w-full px-4 py-2.5 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 rounded-xl text-sm font-bold hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors block text-center">
+                                                                    View Details
                                                                 </Link>
                                                             )}
                                                         </div>
@@ -1068,8 +1056,8 @@ export default function AccountPage() {
                                             <div className="text-center py-12 text-neutral-500 border border-neutral-200 dark:border-neutral-800 rounded-2xl bg-white dark:bg-black">
                                                 <Heart className="w-8 h-8 mx-auto mb-4 text-neutral-300 dark:text-neutral-700" />
                                                 <p>You haven't favorited any businesses or services yet.</p>
-                                                <Link href="/">
-                                                    <button className="mt-4 px-6 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm">Explore Providers</button>
+                                                <Link href="/" className="mt-4 px-6 py-2 bg-black text-white dark:bg-white dark:text-black rounded-xl font-bold text-sm inline-block">
+                                                    Explore Providers
                                                 </Link>
                                             </div>
                                         ) : (
@@ -1099,10 +1087,8 @@ export default function AccountPage() {
                                                                     {isBiz ? 'Business' : 'Service'}
                                                                 </span>
                                                             </div>
-                                                            <Link href={isBiz ? `/business/store/${item.id}` : `/service/${item.id}`}>
-                                                                <button className="p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 rounded-xl text-xs font-bold transition-colors">
-                                                                    View
-                                                                </button>
+                                                            <Link href={isBiz ? `/business/store/${item.id}` : `/service/${item.id}`} className="inline-block p-2.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-900 dark:hover:bg-neutral-800 rounded-xl text-xs font-bold transition-colors">
+                                                                View
                                                             </Link>
                                                         </div>
                                                     )

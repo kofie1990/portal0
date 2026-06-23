@@ -58,8 +58,8 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
-    // Redirect logged-in users away from auth pages
-    if (user && (request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup'))) {
+    // Redirect logged-in users away from auth pages (except /signup/business which allows logged-in users to create a business)
+    if (user && (request.nextUrl.pathname.startsWith('/login') || (request.nextUrl.pathname.startsWith('/signup') && request.nextUrl.pathname !== '/signup/business'))) {
         const url = request.nextUrl.clone()
         url.pathname = '/account'
         return NextResponse.redirect(url)
