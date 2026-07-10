@@ -63,6 +63,27 @@ export const CATEGORY_DIVISIONS = [
             "Nanny & Childcare",
             "Fitness Training & Yoga"
         ]
+    },
+    {
+        name: "Software & IT Services",
+        categories: [
+            "Web Development",
+            "Mobile App Development",
+            "UI/UX Design",
+            "Software Engineering",
+            "IT Support & Networking",
+            "Data Analysis & AI"
+        ]
+    },
+    {
+        name: "Digital & Social Media",
+        categories: [
+            "Social Media Management",
+            "Digital Marketing",
+            "Content Creation",
+            "SEO & Copywriting",
+            "Graphic Design"
+        ]
     }
 ];
 
